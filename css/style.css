@@ -182,3 +182,10 @@ select { background: var(--card2); color: var(--text); border: 1px solid var(--l
 .toast.out { opacity: 0; transform: translateY(-10px); }
 @keyframes tin { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
 #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 40; }
+
+.top-r { display: flex; align-items: center; gap: 6px; }
+#sync { font-size: 13px; color: var(--muted); padding: 4px; }
+.sync-box { text-align: start; background: var(--card2); border-radius: 14px; padding: 14px; margin: 12px 0; }
+.sync-box label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0; }
+.sync-box input[type=text], .sync-box input[type=password] { display: block; width: 100%; margin-top: 4px; padding: 11px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: 16px; text-align: left; }

@@ -1,6 +1,6 @@
 // Service worker — עבודה בלי אינטרנט. להעלות את הגרסה בכל שינוי בקבצים.
-const CACHE = 'trainer-v1';
-const FILES = ['./', 'index.html', 'css/style.css', 'js/data.js', 'js/app.js', 'manifest.webmanifest',
+const CACHE = 'trainer-v2';
+const FILES = ['./', 'index.html', 'css/style.css', 'js/data.js', 'js/sync.js', 'js/app.js', 'manifest.webmanifest',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -11,7 +11,7 @@ self.addEventListener('activate', e => {
 });
 // רשת קודם (כדי לקבל עדכונים), ואם אין אינטרנט — מהמטמון
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
+  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(
     fetch(e.request).then(r => {
       const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return r;

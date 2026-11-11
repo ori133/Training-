@@ -12,7 +12,7 @@ function defaultState() {
     onboarded: false, tracks: {}, history: [], tests: [], xp: 0,
     achievements: {}, claimed: {}, gtg: {}, waist: [], photoCount: 0, photoWeeks: {}, waistWeeks: {},
     skills: { active: 'muscleup', progress: {} },
-    rot: 0, blockCount: 0, current: null, tab: 'today', forceDate: null,
+    rot: 0, blockCount: 0, current: null, tab: 'today', forceDate: null, updatedAt: 0,
   };
 }
 function load() {
@@ -22,7 +22,7 @@ function load() {
 let S = load();
 function ensureTracks() { for (const id in TRACKS) if (!S.tracks[id]) S.tracks[id] = { stage: 0, fails: 0 }; }
 ensureTracks();
-function save() { localStorage.setItem(KEY, JSON.stringify(S)); }
+function save() { S.updatedAt = Date.now(); localStorage.setItem(KEY, JSON.stringify(S)); schedulePush(); }
 
 // ---------- תאריכים ----------
 const z = n => String(n).padStart(2, '0');
@@ -493,7 +493,8 @@ function onboardingHtml() {
     <label class="boss-in"><span>מתח רצופים</span><input id="ob-pull" type="number" inputmode="numeric" min="0" placeholder="0"></label>
     <label class="boss-in"><span>מקבילים רצופים</span><input id="ob-dip" type="number" inputmode="numeric" min="0" placeholder="0"></label>
     <label class="boss-in"><span>שכיבות סמיכה רצופות</span><input id="ob-push" type="number" inputmode="numeric" min="0" placeholder="0"></label>
-    <button class="cta" data-a="onboard">יאללה, מתחילים</button></div>`;
+    <button class="cta" data-a="onboard">יאללה, מתחילים</button>
+    <button class="link" data-a="settings">כבר יש לי נתונים ב-GitHub — להתחבר</button></div>`;
 }
 
 // ============================================================
@@ -621,10 +622,13 @@ const idb = {
     const db = await this.open();
     return new Promise(res => { const out = []; db.transaction('photos').objectStore('photos').openCursor().onsuccess = e => { const c = e.target.result; if (c) { out.push(c.value); c.continue(); } else res(out); }; });
   },
-  async put(rec, del) {
+  async op(fn) {
     const db = await this.open();
-    return new Promise((res, rej) => { const tx = db.transaction('photos', 'readwrite'); const os = tx.objectStore('photos'); del ? os.delete(rec) : os.add(rec); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    return new Promise((res, rej) => { const tx = db.transaction('photos', 'readwrite'); fn(tx.objectStore('photos')); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
   },
+  add(rec) { return this.op(os => os.add(rec)); },
+  update(rec) { return this.op(os => os.put(rec)); },
+  del(id) { return this.op(os => os.delete(id)); },
 };
 function compress(file) {
   return new Promise((res, rej) => {
@@ -651,7 +655,7 @@ async function loadPhotos() {
   box.innerHTML = `${items.length > 1 ? `<div class="cmp" dir="ltr"><img id="cmp-b" src="${items[items.length - 1].url}"><div id="cmp-clip"><img id="cmp-a" src="${items[0].url}"></div><div id="cmp-line"></div></div>
     <input id="cmp-r" type="range" min="0" max="100" value="50" dir="ltr">
     <div class="row small"><label>אחרי <select id="cmp-sb">${opts(items.length - 1)}</select></label><label>לפני <select id="cmp-sa">${opts(0)}</select></label></div>` : ''}
-    <div class="thumbs">${items.map(p => `<div class="th"><img src="${p.url}"><span>${fmtDate(p.date)}</span><button data-a="photo-del" data-k="${p.id}">✕</button></div>`).join('')}</div>`;
+    <div class="thumbs">${items.map(p => `<div class="th"><img src="${p.url}"><span>${fmtDate(p.date)}</span><button data-a="photo-del" data-k="${p.id}" data-r="${p.remote || ''}">✕</button></div>`).join('')}</div>`;
   const upd = () => { const v = $('#cmp-r').value; $('#cmp-clip').style.width = v + '%'; $('#cmp-line').style.left = v + '%'; };
   if (items.length > 1) {
     $('#cmp-r').addEventListener('input', upd); upd();
@@ -738,7 +742,8 @@ const A = {
   photo() { $('#photo-in').click(); },
   async 'photo-del'(t) {
     if (!confirm('למחוק את התמונה?')) return;
-    await idb.put(+t.dataset.k, true); S.photoCount = Math.max(0, S.photoCount - 1); save(); loadPhotos();
+    try { if (t.dataset.r && syncOn()) await deleteRemote(t.dataset.r); } catch (e) { toast('לא הצלחתי למחוק מ-GitHub — נסה שוב כשיש אינטרנט'); return; }
+    await idb.del(+t.dataset.k); S.photoCount = Math.max(0, S.photoCount - 1); save(); loadPhotos();
   },
   'skill-up'(t) {
     const id = t.dataset.k; const p = S.skills.progress[id] || 0;
@@ -756,6 +761,7 @@ const A = {
       <p><b>GTG:</b> סטים קלים לאורך ימי המנוחה מלמדים את מערכת העצבים את התנועה — הדרך המוכחת להעלות מתח מהר.</p>
       <p><b>קרב בוס:</b> כל 9 אימונים (3 שבועות) מבחן מקסימום. התוכנית מתכיילת לפי התוצאות.</p>
       <p><b>הכרס:</b> יורדת בעיקר מתזונה. חלבון בכל ארוחה, גירעון קלורי קטן, שינה וצעדים.</p></div></details>
+      ${syncSettingsHtml()}
       <button class="ghost" data-a="boss-now">🐉 קרב בוס עכשיו</button>
       <button class="ghost" data-a="export">⬇ גיבוי נתונים</button>
       <button class="ghost" data-a="import">⬆ שחזור מגיבוי</button><input id="import-in" type="file" accept="application/json" hidden>
@@ -773,6 +779,28 @@ const A = {
     localStorage.removeItem(KEY); S = defaultState(); ensureTracks(); save(); closeModal(); render();
   },
   close() { closeModal(); },
+  async 'sync-connect'() {
+    const repo = $('#sy-repo').value.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '').replace(/\/$/, '');
+    const token = $('#sy-token').value.trim();
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || !token) { toast('צריך ריפו (שם/ריפו) ומפתח'); return; }
+    const btn = $('[data-a="sync-connect"]'); btn.disabled = true; btn.textContent = 'מתחבר…';
+    const prev = { ...SY }; SY = { repo, token };
+    try {
+      const info = await gh('');
+      if (!info) throw Object.assign(new Error(), { status: 404 });
+      if (!info.private) { SY = prev; toast('⚠️ הריפו הזה ציבורי — הנתונים שלך יהיו גלויים. צור ריפו פרטי.'); btn.disabled = false; btn.textContent = 'חבר'; return; }
+      const remote = await pull();
+      if (remote && (!S.onboarded || (remote.updatedAt || 0) > (S.updatedAt || 0))) applyRemote(remote);
+      else if (S.onboarded) await push();
+      saveSY(); await syncPhotos(); SY.last = Date.now(); saveSY(); setSync('ok');
+      closeModal(); render(); toast(remote && S.onboarded ? '☁️ מחובר — הנתונים נטענו מ-GitHub' : '☁️ מחובר — מעכשיו כל שינוי נשמר ב-GitHub');
+    } catch (e) {
+      SY = prev; saveSY(); btn.disabled = false; btn.textContent = 'חבר';
+      toast(e.status === 401 ? 'המפתח לא תקין או שפג תוקפו' : e.status === 404 ? 'הריפו לא נמצא, או שלמפתח אין גישה אליו' : e.status === 403 ? 'למפתח אין הרשאת Contents: Read and write' : 'החיבור נכשל — בדוק אינטרנט');
+    }
+  },
+  async 'sync-now'() { await syncNow(true); closeModal(); toast(syncState === 'ok' ? '☁️ מסונכרן' : 'הסנכרון נכשל'); },
+  'sync-off'() { if (!confirm('לנתק מ-GitHub? הנתונים יישארו בטלפון ובריפו.')) return; SY = {}; saveSY(); setSync('idle'); closeModal(); },
 };
 
 document.addEventListener('click', e => {
@@ -788,7 +816,7 @@ document.addEventListener('change', async e => {
   if (e.target.id === 'photo-in' && e.target.files[0]) {
     try {
       const blob = await compress(e.target.files[0]);
-      await idb.put({ date: dkey(), blob });
+      await idb.add({ date: dkey(), blob });
       S.photoCount++;
       const wk = weekKey(dkey()); if (!S.photoWeeks[wk]) { S.photoWeeks[wk] = 1; addXp(20); }
       runChecks(); render(); flush(); toast('📸 נשמר');
@@ -806,6 +834,8 @@ document.addEventListener('change', async e => {
 modal.addEventListener('click', e => { if (e.target === modal && !celebrations.length) closeModal(); });
 
 if (S.current) keepAwake(true);
+setSync('idle');
 render();
+if (syncOn()) syncNow();
 flush();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
