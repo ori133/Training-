@@ -189,3 +189,15 @@ select { background: var(--card2); color: var(--text); border: 1px solid var(--l
 .sync-box label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0; }
 .sync-box input[type=text], .sync-box input[type=password] { display: block; width: 100%; margin-top: 4px; padding: 11px; border-radius: 10px;
   border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: 16px; text-align: left; }
+
+/* סרטון מוטיבציה בפתיחה */
+#intro { position: fixed; inset: 0; z-index: 1000; background: #000; display: grid; place-items: center; transition: opacity .3s ease; }
+#intro video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity .25s ease; }
+#intro.ready video { opacity: 1; }
+#intro.out { opacity: 0; pointer-events: none; }
+.intro-load { color: var(--muted); font-weight: 700; }
+#intro.ready .intro-load { display: none; }
+.intro-hint { position: absolute; top: calc(18px + env(safe-area-inset-top)); left: 70px; right: 70px; text-align: center;
+  color: rgba(255,255,255,.75); font-size: 13px; text-shadow: 0 1px 4px #000; pointer-events: none; }
+.intro-snd { position: absolute; top: calc(10px + env(safe-area-inset-top)); left: 12px; width: 44px; height: 44px; border-radius: 50%;
+  border: 0; background: rgba(0,0,0,.45); font-size: 20px; padding: 0; }

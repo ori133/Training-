@@ -837,5 +837,6 @@ if (S.current) keepAwake(true);
 setSync('idle');
 render();
 if (syncOn()) syncNow();
+showIntro();
 flush();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
