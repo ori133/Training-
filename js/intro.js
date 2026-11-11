@@ -23,11 +23,12 @@ async function introBlob() {
     if (hit && hit.headers.get('x-sha') === meta.sha) return null;
     const r = await ghFetch('/contents/' + INTRO_PATH, {}, 'application/vnd.github.raw+json');
     if (!r) return null;
-    const blob = await r.blob();
+    // אייפון מנגן רק אם סוג הקובץ מסומן כווידאו (GitHub מחזיר סוג כללי)
+    const blob = new Blob([await r.blob()], { type: 'video/mp4' });
     if (cache) await cache.put(key, new Response(blob, { headers: { 'Content-Type': 'video/mp4', 'x-sha': meta.sha } }));
     return blob;
   })().catch(() => null);
-  return hit ? hit.blob() : refresh;
+  return hit ? new Blob([await hit.blob()], { type: 'video/mp4' }) : refresh;
 }
 
 // אלמנט וידאו אחד לכל הביקור: אחרי הנגיעה הראשונה הדפדפן מרשה לו לנגן עם סאונד בפעמים הבאות
