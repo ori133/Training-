@@ -8,7 +8,6 @@
 const INTRO_PATH = 'motivation/intro.mp4';
 const INTRO_CACHE = 'intro-video';
 const INTRO_AGAIN_MS = 10 * 60 * 1000; // חזרה לאפליקציה אחרי 10 דקות ברקע = כניסה חדשה
-const INTRO_SOUND = 'pt_intro_sound';
 let introEl = null, introHiddenAt = 0;
 
 async function introBlob() {
@@ -31,45 +30,63 @@ async function introBlob() {
   return hit ? hit.blob() : refresh;
 }
 
+// אלמנט וידאו אחד לכל הביקור: אחרי הנגיעה הראשונה הדפדפן מרשה לו לנגן עם סאונד בפעמים הבאות
+let introVid = null, introUrl = null, introUnlocked = false;
+function introVideo() {
+  if (introVid) return introVid;
+  introVid = document.createElement('video');
+  introVid.setAttribute('playsinline', ''); introVid.setAttribute('webkit-playsinline', '');
+  introVid.preload = 'auto';
+  introVid.addEventListener('ended', closeIntro);
+  return introVid;
+}
+// "פותח" את הסאונד בתוך נגיעה של המשתמש, בשקט, כדי שבכניסה הבאה הסרטון יתחיל ישר עם סאונד
+function unlockIntroSound(e) {
+  if (introUnlocked || !introVid || !introVid.src) return;
+  if (e && e.target.closest && e.target.closest('.intro-snd')) return;
+  const v = introVid, open = !!introEl, t = v.currentTime;
+  if (v.duration) v.currentTime = Math.max(0, v.duration - 0.05); // סוף הסרטון שקט
+  v.muted = false;
+  v.play().then(() => { v.pause(); if (!open) v.currentTime = t; introUnlocked = true; }).catch(() => {});
+}
+document.addEventListener('pointerdown', unlockIntroSound, true);
+
 async function showIntro() {
   if (introEl || !syncOn()) return;
   const el = document.createElement('div');
   el.id = 'intro';
-  el.innerHTML = `<video playsinline webkit-playsinline preload="auto"></video>
-    <div class="intro-load">טוען…</div>
+  el.innerHTML = `<div class="intro-load">טוען…</div>
     <div class="intro-hint">נגיעה במסך כדי להמשיך</div>
     <button class="intro-snd" aria-label="סאונד"></button>`;
+  const v = introVideo(), btn = el.querySelector('.intro-snd');
+  el.prepend(v);
   document.body.appendChild(el);
   introEl = el;
-  const v = el.querySelector('video'), btn = el.querySelector('.intro-snd');
-  const upd = () => { btn.textContent = v.muted ? '🔇' : '🔊'; };
+  const upd = () => { btn.textContent = v.muted ? '🔇' : '🔊'; btn.style.display = v.muted ? '' : 'none'; };
   el.addEventListener('click', e => {
-    if (e.target.closest('.intro-snd')) {
-      v.muted = !v.muted; localStorage.setItem(INTRO_SOUND, v.muted ? '0' : '1'); upd();
-      v.play().catch(() => {});
-      return;
-    }
+    if (e.target.closest('.intro-snd')) { v.muted = false; upd(); v.play().catch(() => {}); return; }
     closeIntro();
   });
-  v.addEventListener('ended', closeIntro);
-  v.muted = localStorage.getItem(INTRO_SOUND) !== '1'; upd();
 
-  const blob = await introBlob();
-  if (introEl !== el) return; // נסגר בזמן הטעינה
-  if (!blob) { closeIntro(); return; }
-  v.src = URL.createObjectURL(blob);
+  if (!introUrl) {
+    const blob = await introBlob();
+    if (introEl !== el) return; // נסגר בזמן הטעינה
+    if (!blob) { closeIntro(); return; }
+    introUrl = URL.createObjectURL(blob); v.src = introUrl;
+  }
+  v.currentTime = 0;
   el.classList.add('ready');
-  // דפדפנים חוסמים ניגון אוטומטי עם סאונד, אז אם צריך מנגנים בלי סאונד
-  v.play().catch(() => { v.muted = true; upd(); v.play().catch(() => {}); });
+  // תמיד מנסים עם סאונד. רק אם הדפדפן חוסם, מנגנים בלי סאונד ומציגים 🔇
+  v.muted = false; upd();
+  v.play().then(upd).catch(() => { v.muted = true; upd(); v.play().catch(() => {}); });
 }
 
 function closeIntro() {
   if (!introEl) return;
   const el = introEl; introEl = null;
-  const v = el.querySelector('video');
-  v.pause();
+  if (introVid) introVid.pause();
   el.classList.add('out');
-  setTimeout(() => { if (v.src) URL.revokeObjectURL(v.src); el.remove(); }, 350);
+  setTimeout(() => el.remove(), 350);
 }
 
 document.addEventListener('visibilitychange', () => {
