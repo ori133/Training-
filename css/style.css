@@ -201,3 +201,7 @@ select { background: var(--card2); color: var(--text); border: 1px solid var(--l
   color: rgba(255,255,255,.75); font-size: 13px; text-shadow: 0 1px 4px #000; pointer-events: none; }
 .intro-snd { position: absolute; top: calc(10px + env(safe-area-inset-top)); left: 12px; width: 44px; height: 44px; border-radius: 50%;
   border: 0; background: rgba(0,0,0,.45); font-size: 20px; padding: 0; }
+.intro-play { display: none; position: absolute; width: 96px; height: 96px; border-radius: 50%; background: rgba(255,122,26,.9);
+  color: #111; font-size: 42px; place-items: center; padding-right: 0; box-shadow: 0 0 40px rgba(255,122,26,.5); pointer-events: none; }
+#intro.blocked .intro-play { display: grid; }
+#intro.blocked .intro-snd { display: none !important; }
