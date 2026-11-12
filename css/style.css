@@ -322,3 +322,4 @@ button.fx-body { font: inherit; }
 .fx-sum > b { min-width: 0; }
 .fx-sum .fx-stepper { flex-shrink: 0; }
 .fx-stepper.mini button { background: var(--card); }
+.ghost-ic { visibility: hidden; }

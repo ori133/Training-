@@ -2,28 +2,14 @@
 // ============================================================
 //  מצב אימון — מסך מלא, דבר אחד בכל פעם, כמעט בלי לגעת בטלפון
 //  סט = נגיעה אחת. מנוחה, חימום, החזקות, EMOM וסקיל רצים לבד.
-//  המאמן מקריא בקול מה עכשיו ומה הבא.
 // ============================================================
 const FX = document.getElementById('focus');
 const fxMem = { beepAt: null, said10: null, key: null };
 
 // ---------- קול ----------
-let heVoice = null;
-function pickVoice() {
-  try { const vs = speechSynthesis.getVoices(); heVoice = vs.find(v => /^he/i.test(v.lang)) || heVoice; } catch (e) {}
-}
-if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
-function speak(t) {
-  if (S.voice === false || !('speechSynthesis' in window) || !t) return;
-  try {
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(t);
-    u.lang = 'he-IL'; if (heVoice) u.voice = heVoice; u.rate = 1.05;
-    speechSynthesis.speak(u);
-  } catch (e) {}
-}
-// אייפון מרשה לדבר רק אחרי שהדיבור הראשון קרה בתוך נגיעה
-function unlockVoice() { try { if ('speechSynthesis' in window) speechSynthesis.speak(new SpeechSynthesisUtterance('')); } catch (e) {} }
+// ההקראה בקול בוטלה לבקשתך. נשארו רק הצפצופים. speak נשאר ריק כדי שלא יהיה צורך לגעת בשאר הקוד.
+function speak() {}
+function unlockVoice() {}
 const sayName = v => v.replace(/\((לכל [^)]*)\)/, '$1').replace(/\s*\([^)]*\)/g, '').replace(/—/g, ',');
 
 // ---------- בניית רצף הצעדים ----------
@@ -267,7 +253,7 @@ function renderFocus() {
   FX.innerHTML = `<div class="fx-top">
       <button class="fx-ic" data-a="fx-list" aria-label="רשימה מלאה">${ic('list')}</button>
       <div class="fx-title">${w.type === 'BOSS' ? 'קרב בוס' : WORKOUTS[w.type].name.replace(/ — .*/, '')}<span id="fx-el">${mmss(Math.floor((Date.now() - w.started) / 1000))}</span></div>
-      <button class="fx-ic" data-a="fx-voice" aria-label="קול">${ic(S.voice === false ? 'mute' : 'sound')}</button></div>
+      <span class="fx-ic ghost-ic"></span></div>
     <div class="fx-prog"><i style="width:${pct}%"></i></div>
     ${body}<div class="fx-foot">${foot}</div>`;
   fxTick(Date.now());
@@ -355,7 +341,6 @@ Object.assign(A, {
   'fx-binc'(t) { const w = S.current; w.boss[t.dataset.k] = (+w.boss[t.dataset.k] || 0) + 1; save(); renderFocus(); },
   'fx-bdec'(t) { const w = S.current; w.boss[t.dataset.k] = Math.max(0, (+w.boss[t.dataset.k] || 0) - 1); save(); renderFocus(); },
   'fx-tsave'() { beep(1100, 0.12); fxNext(); },
-  'fx-voice'() { S.voice = S.voice === false; save(); if (S.voice) { unlockVoice(); speak('הקול פועל'); } else speechSynthesis.cancel(); renderFocus(); },
   'fx-list'() { S.current.list = true; save(); render(); scrollTo(0, 0); },
   'fx-open'() {
     const w = S.current; w.list = false;

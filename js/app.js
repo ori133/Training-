@@ -296,7 +296,7 @@ function nextCard(t) {
   return `<div class="card next"><div class="tag">האימון של היום · ~30 דק׳</div><h2>${W.name}</h2>
     <p class="muted">${W.focus}</p><ul class="plan">${list}<li>פיניש מגלגל המזל</li></ul>
     <button class="cta" data-a="start" data-t="${t}">${ic('play')} התחל אימון</button>
-    <p class="muted small center">מסך מלא, נגיעה אחת לכל סט, המאמן מקריא בקול מה הבא</p>
+    <p class="muted small center">מסך מלא, נגיעה אחת לכל סט, המנוחה והמעברים רצים לבד</p>
     <div class="swap">החלף: ${ROTATION.filter(x => x !== t).map(x => `<button class="chip" data-a="start" data-t="${x}">${x}</button>`).join('')}</div></div>`;
 }
 
