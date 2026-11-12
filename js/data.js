@@ -121,14 +121,15 @@ const WORKOUTS = {
 const ROTATION = ['A', 'B', 'C'];
 const BLOCK_LENGTH = 9; // אחרי 9 אימונים — קרב בוס
 
+// כל תרגיל חימום מקבל זמן, ובמצב אימון הוא עובר לבד לבא אחריו
 const WARMUP = [
-  'סיבובי ידיים קדימה ואחורה — 30 שניות',
-  'תלייה פסיבית על המוט — 20 שניות',
-  'מתח שכמות (רק מורידים ומרימים כתפיים בתלייה) — 8',
-  'תמיכה על המקבילים עם הורדת כתפיים — 8',
-  'סקוואט איטי — 10',
-  'שכיבות סמיכה קלות — 5 עד 8',
-  'פלאנק — 20 שניות',
+  { n: 'סיבובי ידיים קדימה ואחורה', sec: 30 },
+  { n: 'תלייה פסיבית על המוט', sec: 20 },
+  { n: 'מתח שכמות — 8 חזרות', sec: 35, cue: 'בתלייה, רק מורידים ומרימים את הכתפיים. הידיים נשארות ישרות.' },
+  { n: 'תמיכה על המקבילים עם הורדת כתפיים — 8 חזרות', sec: 35 },
+  { n: 'סקוואט איטי — 10 חזרות', sec: 40 },
+  { n: 'שכיבות סמיכה קלות — 5 עד 8', sec: 35 },
+  { n: 'פלאנק', sec: 20 },
 ];
 
 // ---------- פינישים לגלגל המזל ----------
@@ -146,7 +147,7 @@ const FINISHERS = [
 // ---------- עץ הסקילס ----------
 const SKILLS = {
   muscleup: {
-    name: 'מאסל-אפ', icon: '🚀',
+    name: 'מאסל-אפ', icon: 'rocket',
     stages: [
       '10 מתח רצופים נקיים',
       '5 מתח עד החזה (החזה נוגע במוט)',
@@ -157,7 +158,7 @@ const SKILLS = {
     ],
   },
   lsit: {
-    name: 'L-sit', icon: '📐',
+    name: 'L-sit', icon: 'lsit',
     stages: [
       'תמיכה על המקבילים 30 שניות עם כתפיים למטה',
       'L-sit מקופל 15 שניות',
@@ -167,7 +168,7 @@ const SKILLS = {
     ],
   },
   pistol: {
-    name: 'פיסטול סקוואט', icon: '🦵',
+    name: 'פיסטול סקוואט', icon: 'pistol',
     stages: [
       '5 פיסטולים לכל רגל עם אחיזה במוט',
       'פיסטול לספסל 5 לכל רגל',
@@ -177,7 +178,7 @@ const SKILLS = {
     ],
   },
   handstand: {
-    name: 'עמידת ידיים', icon: '🤸',
+    name: 'עמידת ידיים', icon: 'handstand',
     stages: [
       'הליכה על הקיר (חזה לקיר) 30 שניות',
       'עמידת ידיים בקיר 60 שניות',
@@ -187,7 +188,7 @@ const SKILLS = {
     ],
   },
   frontlever: {
-    name: 'פרונט לבר', icon: '🛸',
+    name: 'פרונט לבר', icon: 'lever',
     stages: [
       'Tuck front lever — 10 שניות',
       'Advanced tuck — 10 שניות',
@@ -244,32 +245,32 @@ const CHALLENGE_POOL = [
 
 // ---------- הישגים ----------
 const ACHIEVEMENTS = [
-  { id: 'first', icon: '🔥', name: 'צעד ראשון', desc: 'השלמת אימון ראשון', test: s => s.stats.workouts >= 1 },
-  { id: 'w10', icon: '💪', name: '10 אימונים', desc: 'השלמת 10 אימונים', test: s => s.stats.workouts >= 10 },
-  { id: 'w25', icon: '🏋️', name: '25 אימונים', desc: 'השלמת 25 אימונים', test: s => s.stats.workouts >= 25 },
-  { id: 'w50', icon: '⚔️', name: '50 אימונים', desc: 'חצי מאה', test: s => s.stats.workouts >= 50 },
-  { id: 'w100', icon: '👑', name: 'מאה', desc: 'השלמת 100 אימונים', test: s => s.stats.workouts >= 100 },
-  { id: 'streak2', icon: '📅', name: 'שבועיים ברצף', desc: '2 שבועות רצופים עם 3 אימונים', test: s => s.stats.bestStreak >= 2 },
-  { id: 'streak4', icon: '🗓️', name: 'חודש של ברזל', desc: '4 שבועות רצופים עם 3 אימונים', test: s => s.stats.bestStreak >= 4 },
-  { id: 'streak8', icon: '💎', name: 'הרגל', desc: '8 שבועות רצופים', test: s => s.stats.bestStreak >= 8 },
-  { id: 'pull10', icon: '🎯', name: '10 מתח', desc: '10 מתח רצופים בקרב בוס', test: s => s.stats.maxPull >= 10 },
-  { id: 'pull15', icon: '🦍', name: '15 מתח', desc: '15 מתח רצופים בקרב בוס', test: s => s.stats.maxPull >= 15 },
-  { id: 'dip15', icon: '🪨', name: '15 מקבילים', desc: '15 מקבילים רצופים', test: s => s.stats.maxDip >= 15 },
-  { id: 'dip25', icon: '🗿', name: '25 מקבילים', desc: '25 מקבילים רצופים', test: s => s.stats.maxDip >= 25 },
-  { id: 'push40', icon: '⚡', name: '40 שכיבות', desc: '40 שכיבות סמיכה רצופות', test: s => s.stats.maxPush >= 40 },
-  { id: 'boss1', icon: '🐉', name: 'הבוס הראשון', desc: 'ניצחת בקרב בוס', test: s => s.stats.bosses >= 1 },
-  { id: 'boss3', icon: '🏆', name: 'צייד בוסים', desc: '3 קרבות בוס', test: s => s.stats.bosses >= 3 },
-  { id: 'lvl5', icon: '⭐', name: 'רמה 5', desc: 'הגעת לרמה 5', test: s => s.stats.level >= 5 },
-  { id: 'lvl10', icon: '🌟', name: 'רמה 10', desc: 'הגעת לרמה 10', test: s => s.stats.level >= 10 },
-  { id: 'lvl20', icon: '✨', name: 'רמה 20', desc: 'אגדה', test: s => s.stats.level >= 20 },
-  { id: 'fin10', icon: '🎡', name: 'סובב הגלגל', desc: '10 פינישים', test: s => s.stats.finishers >= 10 },
-  { id: 'gtg5', icon: '🛢️', name: 'שמן במפרקים', desc: '5 משימות GTG', test: s => s.stats.gtgDays >= 5 },
-  { id: 'prog10', icon: '📈', name: 'עולה שלבים', desc: '10 עליות שלב בתרגילים', test: s => s.stats.progressions >= 10 },
-  { id: 'pullk', icon: '🧗', name: '1,000 משיכות', desc: '1,000 חזרות משיכה מצטברות', test: s => s.stats.totalPull >= 1000 },
-  { id: 'pushk', icon: '🧱', name: '2,000 דחיפות', desc: '2,000 חזרות דחיפה מצטברות', test: s => s.stats.totalPush >= 2000 },
-  { id: 'photo', icon: '📸', name: 'תיעוד', desc: 'צילמת תמונת התקדמות ראשונה', test: s => s.stats.photos >= 1 },
-  { id: 'waist2', icon: '📏', name: 'הכרס מתכווצת', desc: 'ירדת 2 ס״מ במותניים', test: s => s.stats.waistDrop >= 2 },
-  { id: 'waist5', icon: '🎉', name: 'חגורה חדשה', desc: 'ירדת 5 ס״מ במותניים', test: s => s.stats.waistDrop >= 5 },
-  { id: 'skill1', icon: '🌱', name: 'סקילר', desc: 'השלמת שלב ראשון בעץ הסקילס', test: s => s.stats.skillStages >= 1 },
-  { id: 'skillmax', icon: '🥋', name: 'מאסטר', desc: 'השלמת עץ סקיל שלם', test: s => s.stats.skillsDone >= 1 },
+  { id: 'first', icon: 'flame', name: 'צעד ראשון', desc: 'השלמת אימון ראשון', test: s => s.stats.workouts >= 1 },
+  { id: 'w10', icon: 'dumbbell', name: '10 אימונים', desc: 'השלמת 10 אימונים', test: s => s.stats.workouts >= 10 },
+  { id: 'w25', icon: 'kettlebell', name: '25 אימונים', desc: 'השלמת 25 אימונים', test: s => s.stats.workouts >= 25 },
+  { id: 'w50', icon: 'swords', name: '50 אימונים', desc: 'חצי מאה', test: s => s.stats.workouts >= 50 },
+  { id: 'w100', icon: 'crown', name: 'מאה', desc: 'השלמת 100 אימונים', test: s => s.stats.workouts >= 100 },
+  { id: 'streak2', icon: 'calendar', name: 'שבועיים ברצף', desc: '2 שבועות רצופים עם 3 אימונים', test: s => s.stats.bestStreak >= 2 },
+  { id: 'streak4', icon: 'calendar-ok', name: 'חודש של ברזל', desc: '4 שבועות רצופים עם 3 אימונים', test: s => s.stats.bestStreak >= 4 },
+  { id: 'streak8', icon: 'gem', name: 'הרגל', desc: '8 שבועות רצופים', test: s => s.stats.bestStreak >= 8 },
+  { id: 'pull10', icon: 'target', name: '10 מתח', desc: '10 מתח רצופים בקרב בוס', test: s => s.stats.maxPull >= 10 },
+  { id: 'pull15', icon: 'mountain', name: '15 מתח', desc: '15 מתח רצופים בקרב בוס', test: s => s.stats.maxPull >= 15 },
+  { id: 'dip15', icon: 'stone', name: '15 מקבילים', desc: '15 מקבילים רצופים', test: s => s.stats.maxDip >= 15 },
+  { id: 'dip25', icon: 'pillar', name: '25 מקבילים', desc: '25 מקבילים רצופים', test: s => s.stats.maxDip >= 25 },
+  { id: 'push40', icon: 'bolt', name: '40 שכיבות', desc: '40 שכיבות סמיכה רצופות', test: s => s.stats.maxPush >= 40 },
+  { id: 'boss1', icon: 'boss', name: 'הבוס הראשון', desc: 'ניצחת בקרב בוס', test: s => s.stats.bosses >= 1 },
+  { id: 'boss3', icon: 'trophy', name: 'צייד בוסים', desc: '3 קרבות בוס', test: s => s.stats.bosses >= 3 },
+  { id: 'lvl5', icon: 'star', name: 'רמה 5', desc: 'הגעת לרמה 5', test: s => s.stats.level >= 5 },
+  { id: 'lvl10', icon: 'star-ring', name: 'רמה 10', desc: 'הגעת לרמה 10', test: s => s.stats.level >= 10 },
+  { id: 'lvl20', icon: 'sparkle', name: 'רמה 20', desc: 'אגדה', test: s => s.stats.level >= 20 },
+  { id: 'fin10', icon: 'wheel', name: 'סובב הגלגל', desc: '10 פינישים', test: s => s.stats.finishers >= 10 },
+  { id: 'gtg5', icon: 'drop', name: 'שמן במפרקים', desc: '5 משימות GTG', test: s => s.stats.gtgDays >= 5 },
+  { id: 'prog10', icon: 'trend', name: 'עולה שלבים', desc: '10 עליות שלב בתרגילים', test: s => s.stats.progressions >= 10 },
+  { id: 'pullk', icon: 'climb', name: '1,000 משיכות', desc: '1,000 חזרות משיכה מצטברות', test: s => s.stats.totalPull >= 1000 },
+  { id: 'pushk', icon: 'wall', name: '2,000 דחיפות', desc: '2,000 חזרות דחיפה מצטברות', test: s => s.stats.totalPush >= 2000 },
+  { id: 'photo', icon: 'camera', name: 'תיעוד', desc: 'צילמת תמונת התקדמות ראשונה', test: s => s.stats.photos >= 1 },
+  { id: 'waist2', icon: 'ruler', name: 'הכרס מתכווצת', desc: 'ירדת 2 ס״מ במותניים', test: s => s.stats.waistDrop >= 2 },
+  { id: 'waist5', icon: 'buckle', name: 'חגורה חדשה', desc: 'ירדת 5 ס״מ במותניים', test: s => s.stats.waistDrop >= 5 },
+  { id: 'skill1', icon: 'sprout', name: 'סקילר', desc: 'השלמת שלב ראשון בעץ הסקילס', test: s => s.stats.skillStages >= 1 },
+  { id: 'skillmax', icon: 'belt', name: 'מאסטר', desc: 'השלמת עץ סקיל שלם', test: s => s.stats.skillsDone >= 1 },
 ];

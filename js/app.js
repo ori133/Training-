@@ -12,7 +12,7 @@ function defaultState() {
     onboarded: false, tracks: {}, history: [], tests: [], xp: 0,
     achievements: {}, claimed: {}, gtg: {}, waist: [], photoCount: 0, photoWeeks: {}, waistWeeks: {},
     skills: { active: 'muscleup', progress: {} },
-    rot: 0, blockCount: 0, current: null, tab: 'today', forceDate: null, updatedAt: 0,
+    rot: 0, blockCount: 0, current: null, tab: 'today', forceDate: null, updatedAt: 0, voice: true,
   };
 }
 function load() {
@@ -121,7 +121,7 @@ function runChecks() {
   S.claimed[wk] = S.claimed[wk] || [];
   for (const c of weekChallenges(wk)) {
     if (!S.claimed[wk].includes(c.id) && m[c.metric] >= c.target) {
-      S.claimed[wk].push(c.id); addXp(100); toast(`🏁 אתגר הושלם: <b>${c.name}</b> +100 XP`);
+      S.claimed[wk].push(c.id); addXp(100); toast(`${ic('flag')} אתגר הושלם: <b>${c.name}</b> +100 XP`);
     }
   }
   let changed = true;
@@ -130,7 +130,7 @@ function runChecks() {
     for (const a of ACHIEVEMENTS) {
       if (!S.achievements[a.id] && a.test({ stats: st })) {
         S.achievements[a.id] = dkey(); addXp(50); changed = true;
-        toast(`${a.icon} הישג חדש: <b>${a.name}</b> +50 XP`); confetti();
+        toast(`${ic(a.icon)} הישג חדש: <b>${a.name}</b> +50 XP`); confetti();
       }
     }
   }
@@ -161,12 +161,13 @@ function buildWorkout(type) {
       }) });
     } else if (b.type === 'skill') {
       const sid = S.skills.active, p = S.skills.progress[sid] || 0, sk = SKILLS[sid];
-      w.blocks.push({ type: 'skill', title: b.title, skill: sid,
+      w.blocks.push({ type: 'skill', title: b.title, skill: sid, minutes: b.minutes || 6,
         stage: p < sk.stages.length ? sk.stages[p] : 'שמירה על הסקיל — תרגול חופשי', done: false });
     } else if (b.type === 'emom') {
       w.blocks.push({ type: 'emom', title: b.title, minutes: b.minutes, stations: emomStations(), roundsDone: 0, startAt: 0 });
     }
   }
+  w.finisher = FINISHERS[Math.floor(Math.random() * FINISHERS.length)];
   return w;
 }
 
@@ -214,7 +215,7 @@ function completeWorkout(fb) {
 function completeBoss() {
   const w = S.current; const vals = {};
   for (const k of ['pull', 'dip', 'push']) {
-    const v = parseInt($(`#boss-${k}`).value, 10);
+    const v = parseInt(w.boss[k], 10);
     if (isNaN(v) || v < 0) { toast('צריך למלא את שלושת המבחנים'); return; }
     vals[k] = v;
   }
@@ -236,6 +237,7 @@ function completeBoss() {
 // ============================================================
 function render() {
   document.querySelectorAll('.tabbar button').forEach(b => b.classList.toggle('on', b.dataset.t === S.tab));
+  renderFocus();
   if (!S.onboarded) { view.innerHTML = onboardingHtml(); return; }
   const r = { today: renderToday, progress: renderProgress, skills: renderSkills, ach: renderAch }[S.tab] || renderToday;
   view.innerHTML = r();
@@ -249,7 +251,7 @@ function heroCard() {
   return `<div class="card hero">
     <div class="lvl"><div class="badge">${L}</div>
       <div class="grow"><div class="rank">${rankOf(L)}</div><div class="muted">${S.xp - base} / ${next - base} XP לרמה ${L + 1}</div></div>
-      <div class="streak">🔥 ${st.curStreak}<small>שבועות ברצף</small></div></div>
+      <div class="streak">${ic('flame')} ${st.curStreak}<small>שבועות ברצף</small></div></div>
     <div class="bar"><i style="width:${pct}%"></i></div></div>`;
 }
 
@@ -261,10 +263,10 @@ function renderToday() {
   const yest = S.history.some(x => x.date === addDays(today, -1));
   const nt = nextType();
   if (doneToday) {
-    h += `<div class="card done-card"><div class="big">✅</div><h2>האימון של היום הושלם</h2>
+    h += `<div class="card done-card">${ic('check-circle', 'big ok')}<h2>האימון של היום הושלם</h2>
       <p class="muted">עכשיו אוכלים חלבון, שותים מים וישנים טוב. השריר נבנה במנוחה.</p></div>`;
   } else if (yest && S.forceDate !== today) {
-    h += `<div class="card"><h2>😴 היום יום מנוחה</h2>
+    h += `<div class="card"><h2>${ic('moon')} היום יום מנוחה</h2>
       <p class="muted">התאמנת אתמול. מנוחה של יום בין אימונים = התוצאות הכי מהירות. האימון הבא שלך: <b>${nt === 'BOSS' ? 'קרב בוס' : WORKOUTS[nt].name}</b>.</p>
       <button class="ghost" data-a="force">בכל זאת להתאמן היום</button></div>`;
     h += gtgCard();
@@ -272,17 +274,17 @@ function renderToday() {
     h += nextCard(nt);
     h += gtgCard();
   }
-  if (nt !== 'BOSS') h += `<div class="card slim">🐉 עוד <b>${BLOCK_LENGTH - S.blockCount}</b> אימונים לקרב הבוס הבא</div>`;
+  if (nt !== 'BOSS') h += `<div class="card slim">${ic('boss')} עוד <b>${BLOCK_LENGTH - S.blockCount}</b> אימונים לקרב הבוס הבא</div>`;
   h += challengesCard(true);
-  h += `<div class="card tip"><b>💡 טיפ היום</b><p>${TIPS[Math.round(parseKey(today).getTime() / 864e5) % TIPS.length]}</p></div>`;
+  h += `<div class="card tip"><b>${ic('bulb')} טיפ היום</b><p>${TIPS[Math.round(parseKey(today).getTime() / 864e5) % TIPS.length]}</p></div>`;
   return h;
 }
 
 function nextCard(t) {
   if (t === 'BOSS') {
-    return `<div class="card boss"><div class="tag">קרב בוס</div><h2>🐉 הגיע הזמן לבדוק כמה התחזקת</h2>
+    return `<div class="card boss"><div class="tag">קרב בוס</div><h2>${ic('boss')} הגיע הזמן לבדוק כמה התחזקת</h2>
       <p>3 מבחני מקסימום: מתח, מקבילים ושכיבות סמיכה. 3 דקות מנוחה ביניהם, רק חזרות נקיות. לפי התוצאות התוכנית מתעדכנת.</p>
-      <button class="cta" data-a="start" data-t="BOSS">⚔️ להילחם</button></div>`;
+      <button class="cta" data-a="start" data-t="BOSS">${ic('swords')} להילחם</button></div>`;
   }
   const W = WORKOUTS[t];
   let list = '';
@@ -292,18 +294,19 @@ function nextCard(t) {
     if (b.type === 'emom') list += `<li>EMOM 16 דקות: ${emomStations().map(s => `${s.name} ${s.reps}`).join(' / ')}</li>`;
   }
   return `<div class="card next"><div class="tag">האימון של היום · ~30 דק׳</div><h2>${W.name}</h2>
-    <p class="muted">${W.focus}</p><ul class="plan">${list}<li>🎡 פיניש מגלגל המזל</li></ul>
-    <button class="cta" data-a="start" data-t="${t}">▶ התחל אימון</button>
+    <p class="muted">${W.focus}</p><ul class="plan">${list}<li>פיניש מגלגל המזל</li></ul>
+    <button class="cta" data-a="start" data-t="${t}">${ic('play')} התחל אימון</button>
+    <p class="muted small center">מסך מלא, נגיעה אחת לכל סט, המאמן מקריא בקול מה הבא</p>
     <div class="swap">החלף: ${ROTATION.filter(x => x !== t).map(x => `<button class="chip" data-a="start" data-t="${x}">${x}</button>`).join('')}</div></div>`;
 }
 
 function gtgCard() {
   const today = dkey(); const g = S.gtg[today] || { sets: 0, reps: gtgTarget().reps }; const tg = gtgTarget();
   const dots = Array.from({ length: 5 }, (_, i) => `<i class="${i < g.sets ? 'on' : ''}"></i>`).join('');
-  return `<div class="card gtg"><h3>🛢️ משימת GTG — לשמן את החריץ</h3>
+  return `<div class="card gtg"><h3>${ic('drop')} משימת GTG — לשמן את החריץ</h3>
     <p class="muted">5 סטים של <b>${tg.reps} ${tg.label}</b> מפוזרים לאורך היום (כל שעה-שעתיים). אף פעם לא עד כישלון. זו השיטה הכי מהירה להעלות מתח.</p>
     <div class="dots">${dots}</div>
-    ${g.sets >= 5 ? '<p class="ok-text">✓ הושלם! +30 XP</p>' : `<button class="ghost" data-a="gtg">+ עשיתי סט</button>`}
+    ${g.sets >= 5 ? `<p class="ok-text">${ic('check')} הושלם! +30 XP</p>` : `<button class="ghost" data-a="gtg">${ic('plus')} עשיתי סט</button>`}
     ${g.sets > 0 && g.sets < 5 ? '<button class="link" data-a="gtg-undo">ביטול</button>' : ''}</div>`;
 }
 
@@ -311,20 +314,21 @@ function challengesCard(mini) {
   const wk = weekKey(dkey()); const m = weekMetrics(wk); const claimed = S.claimed[wk] || [];
   const rows = weekChallenges(wk).map(c => {
     const v = Math.min(m[c.metric], c.target); const ok = claimed.includes(c.id);
-    return `<div class="chal ${ok ? 'ok' : ''}"><div class="row"><b>${ok ? '✅' : '🎯'} ${c.name}</b><span>${v}/${c.target}</span></div>
+    return `<div class="chal ${ok ? 'ok' : ''}"><div class="row"><b>${ic(ok ? 'check-circle' : 'target')} ${c.name}</b><span>${v}/${c.target}</span></div>
       ${mini ? '' : `<div class="muted small">${c.desc} · +100 XP</div>`}<div class="bar thin"><i style="width:${(v / c.target) * 100}%"></i></div></div>`;
   }).join('');
-  return `<div class="card"><h3>⚡ אתגרי השבוע</h3>${rows}</div>`;
+  return `<div class="card"><h3>${ic('bolt')} אתגרי השבוע</h3>${rows}</div>`;
 }
 
 // ---------- מסך אימון פעיל ----------
 function renderWorkout() {
   const w = S.current;
-  const title = w.type === 'BOSS' ? '🐉 קרב בוס' : WORKOUTS[w.type].name;
-  let h = `<div class="wo-head"><h2>${title}</h2><span id="elapsed" class="timer-pill">0:00</span></div>`;
-  h += `<div class="card ${w.warmupDone ? 'collapsed' : ''}"><div class="row"><h3>🔥 חימום — 5 דקות</h3>
-    ${w.warmupDone ? '<span class="ok-text">✓</span>' : ''}</div>
-    ${w.warmupDone ? '' : `<ul class="plan">${WARMUP.map(x => `<li>${x}</li>`).join('')}</ul><button class="ghost" data-a="warm">✓ סיימתי חימום</button>`}</div>`;
+  const title = w.type === 'BOSS' ? 'קרב בוס' : WORKOUTS[w.type].name;
+  let h = `<div class="wo-head"><h2>${title}</h2><span id="elapsed" class="timer-pill">0:00</span></div>
+    <button class="cta" data-a="fx-open">${ic('play')} חזרה למצב אימון</button>`;
+  h += `<div class="card ${w.warmupDone ? 'collapsed' : ''}"><div class="row"><h3>${ic('flame')} חימום — 5 דקות</h3>
+    ${w.warmupDone ? `<span class="ok-text">${ic('check')}</span>` : ''}</div>
+    ${w.warmupDone ? '' : `<ul class="plan">${WARMUP.map(x => `<li>${x.n} — ${x.sec} שנ׳</li>`).join('')}</ul><button class="ghost" data-a="warm">${ic('check')} סיימתי חימום</button>`}</div>`;
 
   if (w.type === 'BOSS') {
     const best = k => Math.max(0, ...S.tests.map(t => t[k] || 0));
@@ -333,8 +337,8 @@ function renderWorkout() {
     h += `<div class="card boss"><h3>3 מבחנים · 3 דקות מנוחה ביניהם</h3>
       <p class="muted">סט אחד מקסימלי בכל תרגיל. רק חזרות מלאות ונקיות נספרות.</p>
       ${f('pull', 'מתח')}${f('dip', 'מקבילים')}${f('push', 'שכיבות סמיכה')}
-      <button class="ghost" data-a="rest" data-s="180">⏱ מנוחה 3 דקות</button></div>
-      <button class="cta" data-a="finish">🏆 סיים קרב</button>
+      <button class="ghost" data-a="rest" data-s="180">${ic('timer')} מנוחה 3 דקות</button></div>
+      <button class="cta" data-a="finish">${ic('trophy')} סיים קרב</button>
       <button class="link danger" data-a="cancel">בטל</button>`;
     return h;
   }
@@ -354,58 +358,58 @@ function renderWorkout() {
             <button class="sm" data-a="minus" data-b="${bi}" data-e="${ei}" data-s="${si}" ${d ? 'disabled' : ''}>−</button>
             <span class="val"><b>${e.log[si]}</b><small>/${t}</small></span>
             <button class="sm" data-a="plus" data-b="${bi}" data-e="${ei}" data-s="${si}" ${d ? 'disabled' : ''}>+</button>
-            <button class="check" data-a="ok" data-b="${bi}" data-e="${ei}" data-s="${si}">${d ? '↺' : '✓'}</button></div>`;
+            <button class="check" data-a="ok" data-b="${bi}" data-e="${ei}" data-s="${si}">${ic(d ? 'undo' : 'check')}</button></div>`;
         });
         h += `</div>`;
       });
       h += `</div>`;
     } else if (b.type === 'skill') {
       const sk = SKILLS[b.skill];
-      h += `<div class="card"><h3>${sk.icon} ${b.title}: ${sk.name}</h3>
+      h += `<div class="card"><h3>${ic(sk.icon)} ${b.title}: ${sk.name}</h3>
         <p><b>היעד שלך:</b> ${b.stage}</p>
         <p class="muted small">נסיונות קצרים ואיכותיים, מנוחה מלאה (60–90 שנ׳) בין נסיון לנסיון. לא עד כישלון. אפשר להחליף סקיל בלשונית "סקילס".</p>
-        <button class="ghost ${b.done ? 'on' : ''}" data-a="skill-done" data-b="${bi}">${b.done ? '✓ תורגל' : 'סמן שתרגלתי'}</button></div>`;
+        <button class="ghost ${b.done ? 'on' : ''}" data-a="skill-done" data-b="${bi}">${b.done ? ic('check') + ' תורגל' : 'סמן שתרגלתי'}</button></div>`;
     } else if (b.type === 'emom') {
       const running = b.startAt && b.roundsDone < b.minutes && !b.stopped;
-      h += `<div class="card emom"><h3>⏱ ${b.title}</h3>
+      h += `<div class="card emom"><h3>${ic('timer')} ${b.title}</h3>
         <p class="muted small">בתחילת כל דקה מבצעים את התחנה ונחים עד סוף הדקה. 4 תחנות × 4 סבבים. אם לא מספיק לנוח — זה בסדר, זה שורף.</p>
         <ol class="stations">${b.stations.map(s => `<li>${s.name} — <b>${s.reps}</b></li>`).join('')}</ol>
-        <div id="emom-${bi}" class="emom-box">${b.stopped || b.roundsDone >= b.minutes ? `✓ ${b.roundsDone} דקות הושלמו` : running ? '' : 'מוכן?'}</div>
+        <div id="emom-${bi}" class="emom-box">${b.stopped || b.roundsDone >= b.minutes ? `${ic('check')} ${b.roundsDone} דקות הושלמו` : running ? '' : 'מוכן?'}</div>
         ${b.stopped || b.roundsDone >= b.minutes ? '' : running
-          ? `<button class="ghost" data-a="emom-stop" data-b="${bi}">⏹ עצור</button>`
-          : `<button class="cta" data-a="emom-start" data-b="${bi}">▶ התחל EMOM</button>`}</div>`;
+          ? `<button class="ghost" data-a="emom-stop" data-b="${bi}">${ic('stop')} עצור</button>`
+          : `<button class="cta" data-a="emom-start" data-b="${bi}">${ic('play')} התחל EMOM</button>`}</div>`;
     }
   });
 
   // פיניש
   if (!w.finisher) {
-    h += `<div class="card wheel"><h3>🎡 פיניש</h3><div id="wheel" class="wheel-box">?</div>
+    h += `<div class="card wheel"><h3>${ic('wheel')} פיניש</h3><div id="wheel" class="wheel-box">?</div>
       <button class="cta alt" data-a="spin">סובב את הגלגל</button></div>`;
   } else {
-    h += `<div class="card wheel"><h3>🎡 פיניש</h3><div class="wheel-box">${w.finisher.name}</div><p class="muted">${w.finisher.desc}</p>
-      ${w.finisherDone ? '<p class="ok-text">✓ הושלם! +30 XP</p>' : '<button class="ghost" data-a="fin-done">✓ סיימתי את הפיניש</button>'}</div>`;
+    h += `<div class="card wheel"><h3>${ic('wheel')} פיניש</h3><div class="wheel-box">${w.finisher.name}</div><p class="muted">${w.finisher.desc}</p>
+      ${w.finisherDone ? `<p class="ok-text">${ic('check')} הושלם! +30 XP</p>` : `<button class="ghost" data-a="fin-done">${ic('check')} סיימתי את הפיניש</button>`}</div>`;
   }
-  h += `<button class="cta" data-a="finish">🏁 סיים אימון</button><button class="link danger" data-a="cancel">בטל אימון</button>`;
+  h += `<button class="cta" data-a="finish">${ic('flag')} סיים אימון</button><button class="link danger" data-a="cancel">בטל אימון</button>`;
   return h;
 }
 
 // ---------- התקדמות ----------
 function renderProgress() {
   const st = stats();
-  let h = `<h2 class="page">📊 התקדמות</h2>`;
+  let h = `<h2 class="page">${ic('chart')} התקדמות</h2>`;
   // תמונות מוטיבציה
   if (MOTIVATION_IMAGES.length) {
-    h += `<div class="card"><h3>🖼️ תמונות מוטיבציה</h3><div class="mot-grid">${MOTIVATION_IMAGES.map(m => {
+    h += `<div class="card"><h3>${ic('image')} תמונות מוטיבציה</h3><div class="mot-grid">${MOTIVATION_IMAGES.map(m => {
       const open = st.level >= m.level;
-      return `<figure class="${open ? '' : 'locked'}"><img src="${m.src}" alt="" loading="lazy">${open ? `<figcaption>${m.caption || ''}</figcaption>` : `<span class="lock">🔒 רמה ${m.level}</span>`}</figure>`;
+      return `<figure class="${open ? '' : 'locked'}"><img src="${m.src}" alt="" loading="lazy">${open ? `<figcaption>${m.caption || ''}</figcaption>` : `<span class="lock">${ic('lock')} רמה ${m.level}</span>`}</figure>`;
     }).join('')}</div></div>`;
   } else {
-    h += `<div class="card slim muted">🖼️ תמונות המוטיבציה שלך ייפתחו כאן לפי רמה, אחרי שתוסיף אותן.</div>`;
+    h += `<div class="card slim muted">${ic('image')} תמונות המוטיבציה שלך ייפתחו כאן לפי רמה, אחרי שתוסיף אותן.</div>`;
   }
   h += challengesCard(false);
   // מבחנים
   const T = S.tests;
-  h += `<div class="card"><h3>💪 שיאים (מבחני בוס)</h3>
+  h += `<div class="card"><h3>${ic('medal')} שיאים (מבחני בוס)</h3>
     <div class="kpis"><div><b>${st.maxPull}</b><small>מתח</small></div><div><b>${st.maxDip}</b><small>מקבילים</small></div><div><b>${st.maxPush}</b><small>שכיבות</small></div></div>
     ${lineChart(T.map(t => fmtDate(t.date)), [
       { name: 'מתח', color: '#ff7a1a', vals: T.map(t => t.pull) },
@@ -414,26 +418,26 @@ function renderProgress() {
   // מותניים
   const W = S.waist;
   const delta = W.length > 1 ? Math.round((W[W.length - 1].cm - W[0].cm) * 10) / 10 : null;
-  h += `<div class="card"><h3>📏 היקף מותניים</h3>
+  h += `<div class="card"><h3>${ic('ruler')} היקף מותניים</h3>
     <p class="muted small">מודדים בגובה הטבור, בבוקר, לפני אוכל. פעם בשבוע-שבועיים. זה המדד האמיתי לכרס.</p>
     <div class="inline"><input id="waist-in" type="number" inputmode="decimal" step="0.5" placeholder="ס״מ"><button class="ghost" data-a="waist">שמור</button></div>
-    ${delta != null ? `<p class="${delta <= 0 ? 'ok-text' : 'muted'}">${delta <= 0 ? '⬇' : '⬆'} ${Math.abs(delta)} ס״מ מהמדידה הראשונה</p>` : ''}
+    ${delta != null ? `<p class="${delta <= 0 ? 'ok-text' : 'muted'}">${ic(delta <= 0 ? 'arrowdown' : 'arrowup')} ${Math.abs(delta)} ס״מ מהמדידה הראשונה</p>` : ''}
     ${lineChart(W.map(x => fmtDate(x.date)), [{ name: 'ס״מ', color: '#ff7a1a', vals: W.map(x => x.cm) }])}</div>`;
   // תמונות לפני/אחרי
-  h += `<div class="card"><h3>📸 לפני / אחרי</h3>
+  h += `<div class="card"><h3>${ic('camera')} לפני / אחרי</h3>
     <p class="muted small">אותה תאורה, אותו מקום, אותה תנוחה. פעם בשבועיים. התמונות נשמרות רק בטלפון.</p>
-    <button class="ghost" data-a="photo">+ הוסף תמונה</button><input id="photo-in" type="file" accept="image/*" hidden>
+    <button class="ghost" data-a="photo">${ic('plus')} הוסף תמונה</button><input id="photo-in" type="file" accept="image/*" hidden>
     <div id="photos"></div></div>`;
   // שלבים נוכחיים
-  h += `<div class="card"><h3>🪜 השלבים שלך עכשיו</h3>${Object.keys(TRACKS).map(id => {
+  h += `<div class="card"><h3>${ic('ladder')} השלבים שלך עכשיו</h3>${Object.keys(TRACKS).map(id => {
     const n = TRACKS[id].stages.length, s = S.tracks[id].stage;
     return `<div class="trk"><div class="row"><b>${TRACKS[id].name}</b><span class="muted small">שלב ${s + 1}/${n}</span></div>
       <div class="small">${fmtStage(id)}</div><div class="bar thin"><i style="width:${((s + 1) / n) * 100}%"></i></div></div>`;
   }).join('')}</div>`;
   // היסטוריה
   const hist = S.history.slice(-15).reverse();
-  h += `<div class="card"><h3>🗒️ אימונים אחרונים</h3>${hist.length ? hist.map(x =>
-    `<div class="hist"><span>${fmtDate(x.date)}</span><b>${x.type === 'BOSS' ? '🐉 בוס' : 'אימון ' + x.type}</b><span class="muted small">${x.mins || '-'} דק׳</span><span class="xp">+${x.xp}</span></div>`).join('')
+  h += `<div class="card"><h3>${ic('list')} אימונים אחרונים</h3>${hist.length ? hist.map(x =>
+    `<div class="hist"><span>${fmtDate(x.date)}</span><b>${x.type === 'BOSS' ? ic('boss') + ' בוס' : 'אימון ' + x.type}</b><span class="muted small">${x.mins || '-'} דק׳</span><span class="xp">+${x.xp}</span></div>`).join('')
     : '<p class="muted">עוד אין אימונים. יאללה.</p>'}</div>`;
   return h;
 }
@@ -463,13 +467,13 @@ function lineChart(labels, series) {
 
 // ---------- סקילס ----------
 function renderSkills() {
-  let h = `<h2 class="page">🌳 עץ הסקילס</h2><p class="muted pad">הסקיל הפעיל מתורגל בכל אימון C. כשאתה מצליח בשלב — סמן אותו וקבל 75 XP.</p>`;
+  let h = `<h2 class="page">${ic('tree')} עץ הסקילס</h2><p class="muted pad">הסקיל הפעיל מתורגל בכל אימון C. כשאתה מצליח בשלב — סמן אותו וקבל 75 XP.</p>`;
   for (const id in SKILLS) {
     const sk = SKILLS[id], p = S.skills.progress[id] || 0, active = S.skills.active === id;
-    h += `<div class="card skill ${active ? 'active' : ''}"><div class="row"><h3>${sk.icon} ${sk.name}</h3><span class="muted small">${p}/${sk.stages.length}</span></div>
+    h += `<div class="card skill ${active ? 'active' : ''}"><div class="row"><h3>${ic(sk.icon)} ${sk.name}</h3><span class="muted small">${p}/${sk.stages.length}</span></div>
       <div class="bar thin"><i style="width:${(p / sk.stages.length) * 100}%"></i></div>
-      <ol class="tree">${sk.stages.map((s, i) => `<li class="${i < p ? 'ok' : i === p ? 'cur' : ''}">${i < p ? '✓ ' : ''}${s}</li>`).join('')}</ol>
-      <div class="row">${p < sk.stages.length ? `<button class="ghost" data-a="skill-up" data-k="${id}">השגתי את השלב ✓</button>` : '<span class="ok-text">🥋 הושלם!</span>'}
+      <ol class="tree">${sk.stages.map((s, i) => `<li class="${i < p ? 'ok' : i === p ? 'cur' : ''}">${i < p ? ic('check') + ' ' : ''}${s}</li>`).join('')}</ol>
+      <div class="row">${p < sk.stages.length ? `<button class="ghost" data-a="skill-up" data-k="${id}">${ic('check')} השגתי את השלב</button>` : `<span class="ok-text">${ic('belt')} הושלם!</span>`}
       ${active ? '<span class="tag">פעיל באימון C</span>' : `<button class="link" data-a="skill-active" data-k="${id}">בחר לאימון C</button>`}</div></div>`;
   }
   return h;
@@ -478,16 +482,16 @@ function renderSkills() {
 // ---------- הישגים ----------
 function renderAch() {
   const n = Object.keys(S.achievements).length;
-  return `<h2 class="page">🏆 הישגים <span class="muted small">${n}/${ACHIEVEMENTS.length}</span></h2>
+  return `<h2 class="page">${ic('trophy')} הישגים <span class="muted small">${n}/${ACHIEVEMENTS.length}</span></h2>
     <div class="ach-grid">${ACHIEVEMENTS.map(a => {
       const d = S.achievements[a.id];
-      return `<div class="ach ${d ? 'on' : ''}"><div class="ic">${d ? a.icon : '🔒'}</div><b>${a.name}</b><small>${a.desc}</small>${d ? `<small class="date">${fmtDate(d)}</small>` : ''}</div>`;
+      return `<div class="ach ${d ? 'on' : ''}"><div class="ic">${ic(d ? a.icon : 'lock')}</div><b>${a.name}</b><small>${a.desc}</small>${d ? `<small class="date">${fmtDate(d)}</small>` : ''}</div>`;
     }).join('')}</div>`;
 }
 
 // ---------- פתיחה ----------
 function onboardingHtml() {
-  return `<div class="card onboard"><div class="big">💪</div><h2>ברוך הבא למאמן שלך</h2>
+  return `<div class="card onboard">${ic('logo', 'big')}<h2>ברוך הבא למאמן שלך</h2>
     <p>3 אימונים בשבוע, 30 דקות, מתח + מקבילים + רצפה. התוכנית עולה איתך שלב אחרי שלב.</p>
     <p class="muted">כדי להתאים את נקודת ההתחלה — עשה עכשיו (או תכתוב לפי מה שאתה יודע) סט אחד מקסימלי מכל תרגיל:</p>
     <label class="boss-in"><span>מתח רצופים</span><input id="ob-pull" type="number" inputmode="numeric" min="0" placeholder="0"></label>
@@ -508,19 +512,19 @@ function flush() {
   const c = celebrations.shift();
   if (c.type === 'summary') {
     const t = c.totals;
-    showModal(`<div class="big">🏁</div><h2>אימון הושלם!</h2><div class="xp-big">+${c.xp} XP</div>
+    showModal(`${ic('flag', 'big')}<h2>אימון הושלם!</h2><div class="xp-big">+${c.xp} XP</div>
       <div class="kpis"><div><b>${t.pull}</b><small>משיכות</small></div><div><b>${t.push}</b><small>דחיפות</small></div><div><b>${c.mins}</b><small>דקות</small></div></div>
-      ${c.ups.length ? `<h3>📈 עלית שלב!</h3>${c.ups.map(u => `<div class="up"><b>${u.name}</b><small>${u.to}</small></div>`).join('')}` : '<p class="muted">לא עלית שלב הפעם — בפעם הבאה סגור את כל הסטים ותעלה.</p>'}
+      ${c.ups.length ? `<h3>${ic('trend')} עלית שלב!</h3>${c.ups.map(u => `<div class="up"><b>${u.name}</b><small>${u.to}</small></div>`).join('')}` : '<p class="muted">לא עלית שלב הפעם — בפעם הבאה סגור את כל הסטים ותעלה.</p>'}
       ${c.downs.length ? `<p class="muted small">ירדנו שלב ב: ${c.downs.map(d => d.name).join(', ')} — כדי לבנות בסיס חזק.</p>` : ''}
       <button class="cta" data-a="close">מעולה</button>`);
   } else if (c.type === 'boss') {
-    const row = (k, n) => `<div class="up"><b>${n}: ${c.vals[k]}</b><small>${c.prs.includes(k) ? `🏅 שיא חדש! (קודם ${c.prev[k]})` : `שיא: ${c.prev[k]}`}</small></div>`;
-    showModal(`<div class="big">🐉</div><h2>הבוס הובס!</h2><div class="xp-big">+${c.xp} XP</div>
+    const row = (k, n) => `<div class="up"><b>${n}: ${c.vals[k]}</b><small>${c.prs.includes(k) ? `${ic('medal')} שיא חדש! (קודם ${c.prev[k]})` : `שיא: ${c.prev[k]}`}</small></div>`;
+    showModal(`${ic('boss', 'big')}<h2>הבוס הובס!</h2><div class="xp-big">+${c.xp} XP</div>
       ${row('pull', 'מתח')}${row('dip', 'מקבילים')}${row('push', 'שכיבות')}
       <p class="muted">התוכנית עודכנה לפי התוצאות. בלוק חדש מתחיל.</p><button class="cta" data-a="close">לבלוק הבא</button>`);
   } else if (c.type === 'level') {
     const img = [...MOTIVATION_IMAGES].reverse().find(m => m.level === c.level);
-    showModal(`<div class="big pop">⭐</div><h2>רמה ${c.level}!</h2><div class="rank">${rankOf(c.level)}</div>
+    showModal(`${ic('star', 'big pop')}<h2>רמה ${c.level}!</h2><div class="rank">${rankOf(c.level)}</div>
       ${img ? `<img class="lvl-img" src="${img.src}" alt=""><p>${img.caption || ''}</p>` : ''}
       <button class="cta" data-a="close">ממשיכים</button>`);
     confetti();
@@ -588,20 +592,25 @@ function tick() {
     }
   }
   const w = S.current;
-  if (!w || S.tab !== 'today') return;
-  const el = $('#elapsed'); if (el) el.textContent = mmss(Math.floor((now - w.started) / 1000));
+  if (!w) return;
+  const fx = !!(w.flow && !w.list);
+  // EMOM רץ תמיד, גם במצב אימון וגם ברשימה
   w.blocks.forEach((b, bi) => {
-    if (b.type !== 'emom' || !b.startAt || b.stopped || b.roundsDone >= b.minutes) return;
+    if (b.type !== 'emom' || !b.startAt || now < b.startAt || b.stopped || b.roundsDone >= b.minutes) return;
     const e = (now - b.startAt) / 1000, m = Math.floor(e / 60);
     if (m >= b.minutes) { b.roundsDone = b.minutes; save(); beepEnd(); render(); return; }
-    if (lastEmomMin[bi] !== m) { if (lastEmomMin[bi] !== undefined) beep(1320, 0.3); lastEmomMin[bi] = m; b.roundsDone = m; save(); }
+    if (lastEmomMin[bi] !== m) { if (lastEmomMin[bi] !== undefined || fx) beep(1320, 0.3); lastEmomMin[bi] = m; b.roundsDone = m; save(); }
     const secLeft = 60 - Math.floor(e % 60);
     if (secLeft <= 3 && lastEmomSec[bi] !== secLeft) { lastEmomSec[bi] = secLeft; beep(660, 0.08); }
+    if (fx || S.tab !== 'today') return;
     const st = b.stations[m % b.stations.length], nx = b.stations[(m + 1) % b.stations.length];
     const box = $(`#emom-${bi}`);
     if (box) box.innerHTML = `<div class="muted small">דקה ${m + 1} מתוך ${b.minutes}</div><div class="emom-now">${st.name} — ${st.reps}</div>
       <div class="emom-sec">${secLeft}</div><div class="muted small">הבא: ${nx.name} ${nx.reps}</div>`;
   });
+  if (fx) { fxTick(now); return; }
+  if (S.tab !== 'today') return;
+  const el = $('#elapsed'); if (el) el.textContent = mmss(Math.floor((now - w.started) / 1000));
 }
 setInterval(tick, 250);
 
@@ -655,7 +664,7 @@ async function loadPhotos() {
   box.innerHTML = `${items.length > 1 ? `<div class="cmp" dir="ltr"><img id="cmp-b" src="${items[items.length - 1].url}"><div id="cmp-clip"><img id="cmp-a" src="${items[0].url}"></div><div id="cmp-line"></div></div>
     <input id="cmp-r" type="range" min="0" max="100" value="50" dir="ltr">
     <div class="row small"><label>אחרי <select id="cmp-sb">${opts(items.length - 1)}</select></label><label>לפני <select id="cmp-sa">${opts(0)}</select></label></div>` : ''}
-    <div class="thumbs">${items.map(p => `<div class="th"><img src="${p.url}"><span>${fmtDate(p.date)}</span><button data-a="photo-del" data-k="${p.id}" data-r="${p.remote || ''}">✕</button></div>`).join('')}</div>`;
+    <div class="thumbs">${items.map(p => `<div class="th"><img src="${p.url}"><span>${fmtDate(p.date)}</span><button data-a="photo-del" data-k="${p.id}" data-r="${p.remote || ''}">${ic('x')}</button></div>`).join('')}</div>`;
   const upd = () => { const v = $('#cmp-r').value; $('#cmp-clip').style.width = v + '%'; $('#cmp-line').style.left = v + '%'; };
   if (items.length > 1) {
     $('#cmp-r').addEventListener('input', upd); upd();
@@ -679,7 +688,8 @@ const A = {
     if (S.current) return;
     const type = t.dataset.t; S.current = buildWorkout(type);
     if (type !== 'BOSS') S.rot = ROTATION.indexOf(type);
-    save(); keepAwake(true); render(); scrollTo(0, 0);
+    S.current.flow = buildFlow(S.current); S.current.pos = 0;
+    keepAwake(true); unlockVoice(); render(); fxEnter(); scrollTo(0, 0);
   },
   force() { S.forceDate = dkey(); save(); render(); },
   warm() { S.current.warmupDone = true; save(); render(); },
@@ -716,18 +726,18 @@ const A = {
     const w = S.current;
     if (w.type === 'BOSS') return completeBoss();
     const any = w.blocks.some(b => (b.ex && b.ex.some(e => e.done.some(d => d != null))) || b.roundsDone > 0 || b.done);
-    if (!any) { toast('עוד לא סימנת אף סט 🙂'); return; }
+    if (!any) { toast('עוד לא סימנת אף סט'); return; }
     showModal(`<h2>איך היה?</h2><p class="muted">התשובה קובעת כמה התוכנית עולה בפעם הבאה.</p>
-      <button class="fb" data-a="fb" data-v="easy">😎 קל מדי<small>קפיצה של 2 שלבים בתרגילים שסגרת</small></button>
-      <button class="fb" data-a="fb" data-v="ok">💪 בדיוק<small>עלייה של שלב אחד</small></button>
-      <button class="fb" data-a="fb" data-v="hard">🥵 קשה מאוד<small>נשארים באותו שלב עוד פעם</small></button>`);
+      <button class="fb" data-a="fb" data-v="easy">${ic('face-cool')} קל מדי<small>קפיצה של 2 שלבים בתרגילים שסגרת</small></button>
+      <button class="fb" data-a="fb" data-v="ok">${ic('face-ok')} בדיוק<small>עלייה של שלב אחד</small></button>
+      <button class="fb" data-a="fb" data-v="hard">${ic('face-hard')} קשה מאוד<small>נשארים באותו שלב עוד פעם</small></button>`);
   },
   fb(t) { modal.classList.remove('open'); completeWorkout(t.dataset.v); },
   cancel() { if (confirm('לבטל את האימון? ההתקדמות באימון הזה לא תישמר.')) { S.current = null; stopRest(); keepAwake(false); save(); render(); } },
   gtg() {
     const today = dkey(); const g = S.gtg[today] || { sets: 0, reps: gtgTarget().reps };
     g.sets++; S.gtg[today] = g;
-    if (g.sets === 5) { addXp(30); confetti(); toast('🛢️ משימת GTG הושלמה! +30 XP'); }
+    if (g.sets === 5) { addXp(30); confetti(); toast(`${ic('drop')} משימת GTG הושלמה! +30 XP`); }
     runChecks(); render(); flush();
   },
   'gtg-undo'() { const g = S.gtg[dkey()]; if (g && g.sets > 0 && g.sets < 5) { g.sets--; save(); render(); } },
@@ -737,7 +747,7 @@ const A = {
     const today = dkey(); S.waist = S.waist.filter(x => x.date !== today); S.waist.push({ date: today, cm: v });
     S.waist.sort((a, b) => a.date.localeCompare(b.date));
     const wk = weekKey(today); if (!S.waistWeeks[wk]) { S.waistWeeks[wk] = 1; addXp(10); }
-    runChecks(); render(); flush(); toast('📏 נשמר');
+    runChecks(); render(); flush(); toast(`${ic('ruler')} נשמר`);
   },
   photo() { $('#photo-in').click(); },
   async 'photo-del'(t) {
@@ -748,12 +758,12 @@ const A = {
   'skill-up'(t) {
     const id = t.dataset.k; const p = S.skills.progress[id] || 0;
     if (p >= SKILLS[id].stages.length) return;
-    S.skills.progress[id] = p + 1; addXp(75); confetti(); toast(`${SKILLS[id].icon} שלב הושלם! +75 XP`);
+    S.skills.progress[id] = p + 1; addXp(75); confetti(); toast(`${ic(SKILLS[id].icon)} שלב הושלם! +75 XP`);
     runChecks(); render(); flush();
   },
   'skill-active'(t) { S.skills.active = t.dataset.k; save(); render(); },
   settings() {
-    showModal(`<h2>⚙️ הגדרות</h2>
+    showModal(`<h2>${ic('gear')} הגדרות</h2>
       <details><summary><b>איך התוכנית עובדת</b></summary><div class="small">
       <p><b>עומס מתקדם:</b> כל תרגיל נמצא בשלב מסוים (סטים × חזרות). סגרת את כל הסטים? עולים שלב. כשהחזרות מגיעות לתקרה — עוברים לווריאציה קשה יותר.</p>
       <p><b>סופרסטים:</b> שני תרגילים לשרירים שונים ברצף. חוסך חצי מזמן המנוחה — ככה נכנס אימון מלא ב-30 דקות.</p>
@@ -762,9 +772,9 @@ const A = {
       <p><b>קרב בוס:</b> כל 9 אימונים (3 שבועות) מבחן מקסימום. התוכנית מתכיילת לפי התוצאות.</p>
       <p><b>הכרס:</b> יורדת בעיקר מתזונה. חלבון בכל ארוחה, גירעון קלורי קטן, שינה וצעדים.</p></div></details>
       ${syncSettingsHtml()}
-      <button class="ghost" data-a="boss-now">🐉 קרב בוס עכשיו</button>
-      <button class="ghost" data-a="export">⬇ גיבוי נתונים</button>
-      <button class="ghost" data-a="import">⬆ שחזור מגיבוי</button><input id="import-in" type="file" accept="application/json" hidden>
+      <button class="ghost" data-a="boss-now">${ic('boss')} קרב בוס עכשיו</button>
+      <button class="ghost" data-a="export">${ic('download')} גיבוי נתונים</button>
+      <button class="ghost" data-a="import">${ic('upload')} שחזור מגיבוי</button><input id="import-in" type="file" accept="application/json" hidden>
       <button class="link danger" data-a="reset">איפוס מלא</button>
       <button class="cta" data-a="close">סגור</button>`);
   },
@@ -788,18 +798,18 @@ const A = {
     try {
       const info = await gh('');
       if (!info) throw Object.assign(new Error(), { status: 404 });
-      if (!info.private) { SY = prev; toast('⚠️ הריפו הזה ציבורי — הנתונים שלך יהיו גלויים. צור ריפו פרטי.'); btn.disabled = false; btn.textContent = 'חבר'; return; }
+      if (!info.private) { SY = prev; toast(`${ic('info')} הריפו הזה ציבורי — הנתונים שלך יהיו גלויים. צור ריפו פרטי.`); btn.disabled = false; btn.textContent = 'חבר'; return; }
       const remote = await pull();
       if (remote && (!S.onboarded || (remote.updatedAt || 0) > (S.updatedAt || 0))) applyRemote(remote);
       else if (S.onboarded) await push();
       saveSY(); await syncPhotos(); SY.last = Date.now(); saveSY(); setSync('ok');
-      closeModal(); render(); toast(remote && S.onboarded ? '☁️ מחובר — הנתונים נטענו מ-GitHub' : '☁️ מחובר — מעכשיו כל שינוי נשמר ב-GitHub');
+      closeModal(); render(); toast(ic('cloud-ok') + (remote && S.onboarded ? ' מחובר — הנתונים נטענו מ-GitHub' : ' מחובר — מעכשיו כל שינוי נשמר ב-GitHub'));
     } catch (e) {
       SY = prev; saveSY(); btn.disabled = false; btn.textContent = 'חבר';
       toast(e.status === 401 ? 'המפתח לא תקין או שפג תוקפו' : e.status === 404 ? 'הריפו לא נמצא, או שלמפתח אין גישה אליו' : e.status === 403 ? 'למפתח אין הרשאת Contents: Read and write' : 'החיבור נכשל — בדוק אינטרנט');
     }
   },
-  async 'sync-now'() { await syncNow(true); closeModal(); toast(syncState === 'ok' ? '☁️ מסונכרן' : 'הסנכרון נכשל'); },
+  async 'sync-now'() { await syncNow(true); closeModal(); toast(syncState === 'ok' ? ic('cloud-ok') + ' מסונכרן' : 'הסנכרון נכשל'); },
   'sync-off'() { if (!confirm('לנתק מ-GitHub? הנתונים יישארו בטלפון ובריפו.')) return; SY = {}; saveSY(); setSync('idle'); closeModal(); },
 };
 
@@ -819,7 +829,7 @@ document.addEventListener('change', async e => {
       await idb.add({ date: dkey(), blob });
       S.photoCount++;
       const wk = weekKey(dkey()); if (!S.photoWeeks[wk]) { S.photoWeeks[wk] = 1; addXp(20); }
-      runChecks(); render(); flush(); toast('📸 נשמר');
+      runChecks(); render(); flush(); toast(`${ic('camera')} נשמר`);
     } catch (err) { toast('שמירת התמונה נכשלה'); }
     e.target.value = '';
   }
@@ -827,16 +837,19 @@ document.addEventListener('change', async e => {
     try {
       const data = JSON.parse(await e.target.files[0].text());
       if (!data || !Array.isArray(data.history)) throw 0;
-      S = Object.assign(defaultState(), data); ensureTracks(); save(); closeModal(); render(); toast('✅ שוחזר');
+      S = Object.assign(defaultState(), data); ensureTracks(); save(); closeModal(); render(); toast(`${ic('check-circle')} שוחזר`);
     } catch (err) { toast('קובץ גיבוי לא תקין'); }
   }
 });
 modal.addEventListener('click', e => { if (e.target === modal && !celebrations.length) closeModal(); });
 
-if (S.current) keepAwake(true);
-setSync('idle');
-render();
-if (syncOn()) syncNow();
-showIntro();
-flush();
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+// הפעלה — אחרי שכל הסקריפטים נטענו (focus.js נטען אחרי הקובץ הזה)
+window.addEventListener('DOMContentLoaded', () => {
+  if (S.current) keepAwake(true);
+  setSync('idle');
+  render();
+  if (syncOn()) syncNow();
+  showIntro();
+  flush();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+});

@@ -2,7 +2,7 @@
 // ============================================================
 //  סרטון מוטיבציה בכל פתיחה של האתר
 //  הסרטון נמצא רק בריפו הפרטי (motivation/intro.mp4), לא באתר הציבורי.
-//  הוא מופיע רק בטלפון שמחובר לריפו הפרטי (הגדרות ⚙️ ← שמירה ב-GitHub).
+//  הוא מופיע רק בטלפון שמחובר לריפו הפרטי (הגדרות ← שמירה ב-GitHub).
 //  נגיעה במסך סוגרת אותו. הוא נשמר בטלפון כדי שייפתח מהר וגם בלי אינטרנט.
 // ============================================================
 const INTRO_PATH = 'motivation/intro.mp4';
@@ -55,17 +55,18 @@ document.addEventListener('pointerdown', unlockIntroSound, true);
 
 async function showIntro() {
   if (introEl || !syncOn()) return;
+  if (S.current) return; // לא קופצים באמצע אימון
   const el = document.createElement('div');
   el.id = 'intro';
   el.innerHTML = `<div class="intro-load">טוען…</div>
     <div class="intro-hint">נגיעה במסך כדי להמשיך</div>
-    <div class="intro-play">▶</div>
+    <div class="intro-play">${ic('play')}</div>
     <button class="intro-snd" aria-label="סאונד"></button>`;
   const v = introVideo(), btn = el.querySelector('.intro-snd');
   el.prepend(v);
   document.body.appendChild(el);
   introEl = el;
-  const upd = () => { btn.textContent = v.muted ? '🔇' : '🔊'; btn.style.display = v.muted ? '' : 'none'; };
+  const upd = () => { btn.innerHTML = ic(v.muted ? 'mute' : 'sound'); btn.style.display = v.muted ? '' : 'none'; };
   el.addEventListener('click', e => {
     // אם הטלפון לא הרשה לנגן לבד (למשל במצב חיסכון בסוללה), הנגיעה הראשונה מפעילה עם סאונד
     if (e.target.closest('.intro-snd') || el.classList.contains('blocked')) {

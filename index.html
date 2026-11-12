@@ -16,8 +16,8 @@
 </head>
 <body>
   <header class="top">
-    <div class="brand">💪 המאמן</div>
-    <div class="top-r"><span id="sync" data-a="settings"></span><button class="icon-btn" data-a="settings" aria-label="הגדרות">⚙️</button></div>
+    <div class="brand"><svg class="i logo" aria-hidden="true"><use href="#i-logo"/></svg> המאמן</div>
+    <div class="top-r"><span id="sync" data-a="settings"></span><button class="icon-btn" data-a="settings" aria-label="הגדרות"><svg class="i" aria-hidden="true"><use href="#i-gear"/></svg></button></div>
   </header>
 
   <main id="view"></main>
@@ -32,19 +32,22 @@
   </div>
 
   <nav class="tabbar">
-    <button data-a="tab" data-t="today"><span>🏋️</span>אימון</button>
-    <button data-a="tab" data-t="progress"><span>📊</span>התקדמות</button>
-    <button data-a="tab" data-t="skills"><span>🌳</span>סקילס</button>
-    <button data-a="tab" data-t="ach"><span>🏆</span>הישגים</button>
+    <button data-a="tab" data-t="today"><svg class="i" aria-hidden="true"><use href="#i-dumbbell"/></svg>אימון</button>
+    <button data-a="tab" data-t="progress"><svg class="i" aria-hidden="true"><use href="#i-chart"/></svg>התקדמות</button>
+    <button data-a="tab" data-t="skills"><svg class="i" aria-hidden="true"><use href="#i-tree"/></svg>סקילס</button>
+    <button data-a="tab" data-t="ach"><svg class="i" aria-hidden="true"><use href="#i-trophy"/></svg>הישגים</button>
   </nav>
 
+  <div id="focus"></div>
   <div id="modal"></div>
   <div id="toasts"></div>
   <canvas id="confetti"></canvas>
 
   <script src="js/data.js"></script>
+  <script src="js/icons.js"></script>
   <script src="js/sync.js"></script>
   <script src="js/intro.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/focus.js"></script>
 </body>
 </html>

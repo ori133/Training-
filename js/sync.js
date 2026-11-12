@@ -13,7 +13,8 @@ let syncState = 'idle', dirty = false, pushTimer = null, chain = Promise.resolve
 function setSync(st) {
   syncState = st;
   const el = document.getElementById('sync'); if (!el) return;
-  el.textContent = !syncOn() ? '' : { ok: '☁️✓', busy: '☁️…', err: '☁️⚠️', off: '☁️✕', idle: '☁️' }[st] || '☁️';
+  el.innerHTML = !syncOn() ? '' : ic({ ok: 'cloud-ok', busy: 'cloud-busy', err: 'cloud-err', off: 'cloud-off', idle: 'cloud' }[st] || 'cloud');
+  el.className = 'sy-' + st;
 }
 const serial = fn => (chain = chain.then(fn).catch(() => {}));
 
@@ -133,12 +134,12 @@ document.addEventListener('visibilitychange', () => {
 
 function syncSettingsHtml() {
   if (syncOn()) {
-    return `<div class="sync-box"><h3>☁️ שמירה ב-GitHub</h3>
+    return `<div class="sync-box"><h3>${ic('cloud')} שמירה ב-GitHub</h3>
       <p class="ok-text">מחובר ל-${SY.repo}</p>
       <p class="muted small">כל שינוי נשמר אוטומטית תוך כמה שניות. סנכרון אחרון: ${SY.last ? new Date(SY.last).toLocaleString('he-IL') : '—'}</p>
       <button class="ghost" data-a="sync-now">סנכרן עכשיו</button><button class="link" data-a="sync-off">נתק</button></div>`;
   }
-  return `<div class="sync-box"><h3>☁️ שמירה ב-GitHub</h3>
+  return `<div class="sync-box"><h3>${ic('cloud')} שמירה ב-GitHub</h3>
     <p class="muted small">ההתקדמות והתמונות יישמרו אוטומטית בריפו פרטי שלך.</p>
     <label>ריפו פרטי<input id="sy-repo" type="text" dir="ltr" value="ori133/training-data" autocapitalize="off" autocorrect="off"></label>
     <label>מפתח (token)<input id="sy-token" type="password" dir="ltr" placeholder="github_pat_..." autocapitalize="off" autocorrect="off"></label>
