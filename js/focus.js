@@ -271,6 +271,7 @@ function renderFocus() {
     <div class="fx-prog"><i style="width:${pct}%"></i></div>
     ${body}<div class="fx-foot">${foot}</div>`;
   fxTick(Date.now());
+  FG.kick();
 }
 
 function pickerHtml() {

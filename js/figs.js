@@ -19,21 +19,52 @@ const FG = (() => {
     if (e) return [a, e, b];
     return ik(a, b, l1, l2, s);
   }
-  function figure(f) {
-    if (f.raw) return `<svg viewBox="0 0 120 100" class="fg" aria-hidden="true"><g class="fg-p">${f.props || ''}</g>${f.raw}</svg>`;
+  let UID = 0;
+  const HL = {};
+  const hlSet = (keys, parts) => keys.split(' ').forEach(k => { HL[k] = parts; });
+  hlSet('pull pullNeg pullWide pullPause archerPull chin chinNeg chinSlow scap muscleup frontlever dbRow', ['torso', 'arms']);
+  hlSet('dip dipNeg dipPause dipExp dipShrug pushup diamond pushFeetUp archerPush pseudo easyPush dbPress', ['arms', 'torso']);
+  hlSet('squat slowSquat jumpSquat bulgarian shrimp pistol pistolAssist lunge jumpLunge cossack wallsit goblet bridge rdl', ['legs']);
+  hlSet('kneeRaise legRaise t2b wipers plank hollow lsit lsitTuck mountain', ['torso']);
+  hlSet('dbCurl hangPassive armCircles handstand', ['arms']);
+  hlSet('burpee', ['legs', 'torso', 'arms']);
+  const poly = pts => `points="${pl(pts)}"`;
+  function headSvg(h, face, bad) {
+    const x = h[0].toFixed(1), y = h[1].toFixed(1);
+    if (face) {
+      const id = 'hc' + (UID++), r = 8;
+      return `<defs><clipPath id="${id}"><circle cx="${x}" cy="${y}" r="${r}"/></clipPath></defs>
+        <circle class="fg-hr${bad ? ' bad' : ''}" cx="${x}" cy="${y}" r="${r + 1.4}"/>
+        <image href="${face}" x="${(h[0] - r).toFixed(1)}" y="${(h[1] - r).toFixed(1)}" width="${r * 2}" height="${r * 2}" clip-path="url(#${id})" preserveAspectRatio="xMidYMid slice"/>`;
+    }
+    return `<circle class="fg-h" cx="${x}" cy="${y}" r="6.4"/><circle class="fg-eye" cx="${(h[0] + 2.4).toFixed(1)}" cy="${(h[1] - 0.6).toFixed(1)}" r="1.1"/>`;
+  }
+  function figure(f, hl, noFace) {
+    if (f.raw) return `<svg viewBox="${f.vb || '0 0 120 100'}" class="fg" aria-hidden="true"><g class="fg-p">${f.props || ''}</g>${f.raw}</svg>`;
     const n = f.n, p = f.p;
-    let L = Math.hypot(n[0] - p[0], n[1] - p[1]) || 1;
+    const L = Math.hypot(n[0] - p[0], n[1] - p[1]) || 1;
     const ux = (n[0] - p[0]) / L, uy = (n[1] - p[1]) / L;
     let h = f.hd;
-    if (!h) { h = [n[0] + ux * 9.5, n[1] + uy * 9.5]; if (f.w && f.w[1] < n[1] - 10 && !f.f2) h = [h[0] + 6, h[1] + 1]; }
-    let far = '', near = '';
-    if (f.w2) far += `<polyline class="fg-b fg-far" points="${pl(limb(n, f.w2, AL, AL, f.eb2 == null ? 1 : f.eb2, f.e2))}"/>`;
-    if (f.f2) far += `<polyline class="fg-b fg-far" points="${pl(limb(p, f.f2, LL, LL, f.kb2 == null ? -1 : f.kb2))}"/>`;
-    if (f.f) near += `<polyline class="fg-b" points="${pl(limb(p, f.f, LL, LL, f.kb == null ? -1 : f.kb))}"/>`;
-    near += `<line class="fg-b" x1="${p[0]}" y1="${p[1]}" x2="${n[0]}" y2="${n[1]}"/>`;
-    if (f.w) near += `<polyline class="fg-b" points="${pl(limb(n, f.w, AL, AL, f.eb == null ? 1 : f.eb, f.e))}"/>`;
-    return `<svg viewBox="${f.vb || '0 0 120 100'}" class="fg${f.bad ? ' bad' : ''}" aria-hidden="true"><g class="fg-p">${f.props || ''}</g>
-      ${far}${near}<circle class="fg-h" cx="${h[0].toFixed(1)}" cy="${h[1].toFixed(1)}" r="5.5"/>${f.extra || ''}</svg>`;
+    if (!h) { h = [n[0] + ux * 10.5, n[1] + uy * 10.5]; if (f.w && f.w[1] < n[1] - 10 && !f.f2) h = [h[0] + 6, h[1] + 1]; }
+    const arm = f.w ? limb(n, f.w, AL, AL, f.eb == null ? 1 : f.eb, f.e) : null;
+    const arm2 = f.w2 ? limb(n, f.w2, AL, AL, f.eb2 == null ? 1 : f.eb2, f.e2) : null;
+    const leg = f.f ? limb(p, f.f, LL, LL, f.kb == null ? -1 : f.kb) : null;
+    const leg2 = f.f2 ? limb(p, f.f2, LL, LL, f.kb2 == null ? -1 : f.kb2) : null;
+    const torso = [p, n];
+    let g = '';
+    const parts = hl || [];
+    if (parts.includes('arms')) [arm, arm2].forEach(a => { if (a) g += `<polyline class="fg-hl" ${poly(a)}/>`; });
+    if (parts.includes('legs')) [leg, leg2].forEach(a => { if (a) g += `<polyline class="fg-hl" ${poly(a)}/>`; });
+    if (parts.includes('torso')) g += `<polyline class="fg-hl" ${poly(torso)}/>`;
+    const seg = (pts, cls) => `<polyline class="fg-o ${cls}" ${poly(pts)}/><polyline class="fg-b ${cls}" ${poly(pts)}/>`;
+    let body = '';
+    if (arm2) body += seg(arm2, 'fg-far');
+    if (leg2) body += seg(leg2, 'fg-far');
+    body += seg(torso, 'fg-torso');
+    if (leg) body += seg(leg, '');
+    if (arm) body += seg(arm, '');
+    const ends = [arm && arm[2], arm2 && arm2[2], leg && leg[2], leg2 && leg2[2]].filter(Boolean).map(e => `<circle class="fg-end" cx="${e[0].toFixed(1)}" cy="${e[1].toFixed(1)}" r="3.4"/>`).join('');
+    return `<svg viewBox="${f.vb || '0 0 120 100'}" class="fg${f.bad ? ' bad' : ''}" aria-hidden="true"><g class="fg-p">${f.props || ''}</g>${g}${body}${ends}${headSvg(h, noFace ? null : FG.faceUrl, f.bad)}${f.extra || ''}</svg>`;
   }
 
   // ---- ציוד וחצים ----
@@ -277,9 +308,55 @@ const FG = (() => {
   FIGS.slowSquat = FIGS.squat;
 
   function frames(key) { return FIGS[key] || []; }
-  const strip = (key, cls = '') => `<div class="fgs ${cls}">${frames(key).map(f => `<figure class="fgf">${figure(f)}${f.cap ? `<figcaption>${f.cap}</figcaption>` : ''}</figure>`).join('')}</div>`;
-  // תמונה אחת קטנה (הפריים האחרון) לכרטיסים קטנים
-  const mini = key => { const fr = frames(key); return fr.length ? `<div class="fgm">${fr.slice(0, 2).map(f => figure(f)).join('')}</div>` : ''; };
+  const good = key => frames(key).filter(f => !f.bad);
+  const strip = (key, cls = '') => `<div class="fgs ${cls}">${frames(key).map(f => `<figure class="fgf">${figure(f, HL[key])}${f.cap ? `<figcaption>${f.cap}</figcaption>` : ''}</figure>`).join('')}</div>`;
+  // אנימציה: מקום שה-FG.kick ממלא ומזיז
+  const anim = (key, cls = '') => frames(key).length ? `<div class="fg-anim ${cls}" data-k="${key}">${figure(frames(key)[0], HL[key])}</div>` : '';
+  const mini = key => anim(key, 'mini');
+
+  // ---- אנימציה בין פריימים (שיכון בין מפרקים) ----
+  const JK = ['n', 'p', 'w', 'f', 'e', 'w2', 'f2', 'e2', 'hd'];
+  const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  function mix(a, b, t) {
+    const o = Object.assign({}, t < .5 ? a : b, { cap: '' });
+    for (const k of JK) { const x = a[k] || b[k], y = b[k] || a[k]; if (x && y) o[k] = lerp(x, y, t); else delete o[k]; }
+    o.vb = a.vb || b.vb; o.bad = false;
+    return o;
+  }
+  const HOLD = 450, MOVE = 1100;
+  function frameAt(key, ms) {
+    const fr = good(key); if (fr.length < 2) return fr[0] || frames(key)[0];
+    const order = []; for (let i = 0; i < fr.length; i++) order.push(i); for (let i = fr.length - 2; i > 0; i--) order.push(i);
+    const slot = HOLD + MOVE, cyc = slot * order.length, t = ms % cyc, si = Math.floor(t / slot), r = t - si * slot;
+    const a = fr[order[si]], b = fr[order[(si + 1) % order.length]];
+    if (r < HOLD) return a;
+    if (a.raw || b.raw) return (r - HOLD) / MOVE < .5 ? a : b;
+    return mix(a, b, ease((r - HOLD) / MOVE));
+  }
+  let raf = 0, last = 0, t0 = 0;
+  function loop(now) {
+    raf = 0;
+    const els = document.querySelectorAll('.fg-anim, .myp-anim');
+    if (!els.length) return;
+    if (!t0) t0 = now;
+    if (now - last > 40) {
+      last = now;
+      els.forEach(el => {
+        if (!el.offsetParent) return;
+        if (el.classList.contains('myp-anim')) {
+          const imgs = el.querySelectorAll('img'); if (imgs.length < 2) return;
+          const order = []; for (let i = 0; i < imgs.length; i++) order.push(i); for (let i = imgs.length - 2; i > 0; i--) order.push(i);
+          const cur = order[Math.floor((now - t0) / 1100) % order.length];
+          imgs.forEach((im, i) => im.classList.toggle('on', i === cur));
+          return;
+        }
+        el.innerHTML = figure(frameAt(el.dataset.k, now - t0), HL[el.dataset.k]);
+      });
+    }
+    raf = requestAnimationFrame(loop);
+  }
+  const kick = () => { if (!raf) raf = requestAnimationFrame(loop); };
   const keys = () => Object.keys(FIGS);
-  return { strip, mini, keys, figure, frames };
+  return { strip, mini, anim, kick, keys, figure, frames, good, HL, faceUrl: null };
 })();

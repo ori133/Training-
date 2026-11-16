@@ -46,13 +46,34 @@ function stepGuide(st) {
 }
 
 const guideEl = () => document.getElementById('guide');
+const MYP = {}, MYMODE = {};
+const animWrap = k => {
+  const imgs = (MYP[k] || []).filter(Boolean);
+  return MYMODE[k] === 'me' && imgs.length >= 2 ? `<div class="myp-anim" data-k="${k}">${imgs.map(u => `<img src="${u}" alt="">`).join('')}</div>` : FG.anim(k);
+};
+function mypHtml(k) {
+  const fr = FG.good(k), arr = MYP[k] || [], n = arr.filter(Boolean).length;
+  return `<div class="myp" data-k="${k}"><h4>${ic('camera')} התמונות שלי</h4>
+    <p class="small muted">צלם את עצמך בכל שלב של התרגיל. התמונות נשמרות רק בטלפון.</p>
+    <div class="myp-row">${fr.map((f, i) => arr[i]
+      ? `<div class="myp-slot"><img src="${arr[i]}" alt=""><button class="x" data-a="myp-del" data-k="${k}" data-i="${i}" aria-label="מחק">${ic('x')}</button><div>${f.cap || ''}</div></div>`
+      : `<div class="myp-slot"><button class="ph" data-a="myp-add" data-k="${k}" data-i="${i}">${ic('plus')}</button><div>${f.cap || ''}</div></div>`).join('')}</div>
+    ${n >= 2 ? `<div class="seg"><button class="${MYMODE[k] !== 'me' ? 'on' : ''}" data-a="myp-mode" data-k="${k}" data-v="ill">איור</button><button class="${MYMODE[k] === 'me' ? 'on' : ''}" data-a="myp-mode" data-k="${k}" data-v="me">אנימציה מהתמונות שלי</button></div>` : ''}</div>`;
+}
+function refreshMyp(k) {
+  document.querySelectorAll(`.anim-wrap[data-k="${k}"]`).forEach(el => { el.innerHTML = animWrap(k); });
+  document.querySelectorAll(`.myp[data-k="${k}"]`).forEach(el => { el.outerHTML = mypHtml(k); });
+  FG.kick();
+}
 function guideSection(k, open) {
   const g = GUIDES[k];
   return `<details class="gd" ${open ? 'open' : ''}><summary><b>${g.n}</b><small>${g.m}</small></summary>
+    <div class="anim-wrap" data-k="${g.fig}">${animWrap(g.fig)}</div>
     ${FG.strip(g.fig)}
     <h4>איך מבצעים</h4><ol>${g.steps.map(x => `<li>${x}</li>`).join('')}</ol>
     <h4>טעויות נפוצות</h4><ul class="bad">${g.bad.map(x => `<li>${x}</li>`).join('')}</ul>
     <div class="gd-lvl"><div><small>קשה מדי?</small>${g.easy}</div><div><small>קל מדי?</small>${g.hard}</div></div>
+    ${mypHtml(g.fig)}
     <div class="why"><h4>${ic('book')} למה התרגיל הזה, לפי מחקר</h4><p>${g.why[0]}</p><cite>${g.why[1]}</cite></div></details>`;
 }
 function openGuide(info) {
@@ -65,6 +86,7 @@ function openGuide(info) {
     <button class="fx-ic" data-a="guide-close" aria-label="סגור">${ic('x')}</button></div>
     <div class="gd-scroll">${info.keys.map((k, i) => guideSection(k, i === 0 || info.keys.length === 1)).join('')}${ctx}</div></div>`;
   el.classList.add('open');
+  FG.kick();
 }
 function closeGuide() { guideEl().classList.remove('open'); }
 
@@ -247,5 +269,65 @@ Object.assign(A, {
   },
 });
 
+// ---------- התמונות שלי: תמונת פנים על הדמות + תמונות לכל תרגיל (נשמרות רק במכשיר) ----------
+FG.faceUrl = localStorage.getItem('pt_face') || null;
+const exdb = {
+  db: null,
+  open() {
+    if (this.db) return Promise.resolve(this.db);
+    return new Promise((res, rej) => { const r = indexedDB.open('trainer_ex', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('ex', { keyPath: 'id' });
+      r.onsuccess = () => { this.db = r.result; res(r.result); }; r.onerror = () => rej(r.error); });
+  },
+  async all() { const db = await this.open(); return new Promise(res => { const o = []; db.transaction('ex').objectStore('ex').openCursor().onsuccess = ev => { const c = ev.target.result; if (c) { o.push(c.value); c.continue(); } else res(o); }; }); },
+  async put(id, blob) { const db = await this.open(); return new Promise((res, rej) => { const tx = db.transaction('ex', 'readwrite'); tx.objectStore('ex').put({ id, blob }); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); },
+  async del(id) { const db = await this.open(); return new Promise((res, rej) => { const tx = db.transaction('ex', 'readwrite'); tx.objectStore('ex').delete(id); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); },
+};
+async function loadMyp() {
+  try { (await exdb.all()).forEach(r => { const [k, i] = r.id.split(':'); (MYP[k] = MYP[k] || [])[+i] = URL.createObjectURL(r.blob); }); } catch (e) {}
+}
+function cropFace(file) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => { const s = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = 144;
+      c.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) * 0.35, s, s, 0, 0, 144, 144); URL.revokeObjectURL(img.src); res(c.toDataURL('image/jpeg', 0.85)); };
+    img.onerror = rej; img.src = URL.createObjectURL(file);
+  });
+}
+const faceBox = () => `<div class="face-pick">${FG.faceUrl ? `<img src="${FG.faceUrl}" alt="">` : `<span class="ph">${ic('camera')}</span>`}
+  <div class="grow"><b>התמונה שלי על הדמות</b><div class="small muted">הפנים שלך מופיעות בראש של כל האיורים. נשמר רק בטלפון.</div></div>
+  <button class="ghost" data-a="face-add">${FG.faceUrl ? 'החלף' : 'הוסף'}</button>${FG.faceUrl ? `<button class="ghost" data-a="face-del" aria-label="הסר">${ic('x')}</button>` : ''}</div>`;
+let mypPending = null;
+const hiddenInput = id => { let i = document.getElementById(id); if (!i) { i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; i.id = id; i.hidden = true; document.body.appendChild(i); } return i; };
+Object.assign(A, {
+  'face-add'() { hiddenInput('face-in').click(); },
+  'face-del'() { localStorage.removeItem('pt_face'); FG.faceUrl = null; A.settings(); if (S.current) renderFocus(); },
+  'myp-add'(t) { mypPending = { k: t.dataset.k, i: +t.dataset.i }; hiddenInput('myp-in').click(); },
+  async 'myp-del'(t) {
+    const k = t.dataset.k, i = +t.dataset.i; if (!confirm('למחוק את התמונה?')) return;
+    try { await exdb.del(`${k}:${i}`); } catch (e) {}
+    if (MYP[k] && MYP[k][i]) { URL.revokeObjectURL(MYP[k][i]); MYP[k][i] = null; }
+    refreshMyp(k);
+  },
+  'myp-mode'(t) { MYMODE[t.dataset.k] = t.dataset.v; refreshMyp(t.dataset.k); },
+});
+document.addEventListener('change', async ev => {
+  const f = ev.target.files && ev.target.files[0]; if (!f) return;
+  if (ev.target.id === 'face-in') {
+    try { FG.faceUrl = await cropFace(f); localStorage.setItem('pt_face', FG.faceUrl); A.settings(); if (S.current) renderFocus(); toast(`${ic('check-circle')} התמונה נשמרה`); }
+    catch (e) { toast('לא הצלחתי לקרוא את התמונה'); }
+    ev.target.value = '';
+  }
+  if (ev.target.id === 'myp-in' && mypPending) {
+    const { k, i } = mypPending; mypPending = null;
+    try {
+      const blob = await compress(f); await exdb.put(`${k}:${i}`, blob);
+      if (MYP[k] && MYP[k][i]) URL.revokeObjectURL(MYP[k][i]);
+      (MYP[k] = MYP[k] || [])[i] = URL.createObjectURL(blob); refreshMyp(k); toast(`${ic('check-circle')} נשמר`);
+    } catch (e) { toast('שמירת התמונה נכשלה'); }
+    ev.target.value = '';
+  }
+});
+loadMyp();
 window.addEventListener('DOMContentLoaded', () => { applyTheme(); });
 applyTheme();
