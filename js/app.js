@@ -12,7 +12,7 @@ function defaultState() {
     onboarded: false, tracks: {}, history: [], tests: [], xp: 0,
     achievements: {}, claimed: {}, gtg: {}, waist: [], photoCount: 0, photoWeeks: {}, waistWeeks: {},
     skills: { active: 'muscleup', progress: {} },
-    rot: 0, blockCount: 0, current: null, tab: 'today', forceDate: null, updatedAt: 0, voice: true, theme: 'auto',
+    rot: 0, blockCount: 0, current: null, tab: 'today', forceDate: null, updatedAt: 0, voice: true, theme: 'auto', introSound: false,
   };
 }
 function load() {
@@ -558,6 +558,7 @@ function confetti() {
 // ============================================================
 let actx = null;
 function unlockAudio() {
+  try { if (navigator.audioSession) navigator.audioSession.type = 'ambient'; } catch (e) {}
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
   if (actx && actx.state === 'suspended') actx.resume();
 }
@@ -778,6 +779,7 @@ const A = {
       <p><b>הכרס:</b> יורדת בעיקר מתזונה. חלבון בכל ארוחה, גירעון קלורי קטן, שינה וצעדים.</p></div></details>
       <div class="theme-pick"><b>${ic('sun')} מראה</b><div class="seg">
         ${[['auto', 'לפי המכשיר'], ['light', 'בהיר'], ['dark', 'כהה']].map(([k, n]) => `<button data-a="theme-set" data-k="${k}" class="${(S.theme || 'auto') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+      <button class="ghost" data-a="intro-sound">${ic(S.introSound ? 'sound' : 'mute')} סאונד בסרטון הפתיחה: ${S.introSound ? 'פעיל (קוטע מוזיקה)' : 'כבוי (לא קוטע מוזיקה)'}</button>
       <button class="ghost" data-a="music-open">${ic('music')} מוזיקה (Spotify / Apple Music)</button>
       <button class="ghost" data-a="science">${ic('book')} המדע שמאחורי התוכנית</button>
       ${syncSettingsHtml()}

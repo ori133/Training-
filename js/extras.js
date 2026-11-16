@@ -212,6 +212,7 @@ Object.assign(A, {
   'guide-close'() { closeGuide(); },
   remain() { const w = S.current; if (!w || !w.flow) return; showModal(remainHtml()); },
   science() { closeGuide(); showModal(scienceHtml()); },
+  'intro-sound'() { S.introSound = !S.introSound; save(); A.settings(); },
   'theme-toggle'() { S.theme = resolvedTheme() === 'light' ? 'dark' : 'light'; save(); applyTheme(); },
   'theme-set'(t) { S.theme = t.dataset.k; save(); applyTheme(); A.settings(); },
   'music-open'() { closeModal(); ensureMusic().classList.add('open'); },
