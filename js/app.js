@@ -12,7 +12,7 @@ function defaultState() {
     onboarded: false, tracks: {}, history: [], tests: [], xp: 0,
     achievements: {}, claimed: {}, gtg: {}, waist: [], photoCount: 0, photoWeeks: {}, waistWeeks: {},
     skills: { active: 'muscleup', progress: {} },
-    rot: 0, blockCount: 0, current: null, tab: 'today', forceDate: null, updatedAt: 0, voice: true, theme: 'auto', introSound: false,
+    rot: 0, blockCount: 0, current: null, tab: 'today', forceDate: null, updatedAt: 0, voice: true, theme: 'auto', introSound: true,
   };
 }
 function load() {
@@ -20,6 +20,7 @@ function load() {
   return defaultState();
 }
 let S = load();
+if (!localStorage.getItem('pt_intro_snd2')) { S.introSound = true; localStorage.setItem('pt_intro_snd2', '1'); } // סאונד בסרטון הפתיחה חוזר לפעול
 function ensureTracks() { for (const id in TRACKS) if (!S.tracks[id]) S.tracks[id] = { stage: 0, fails: 0 }; }
 ensureTracks();
 function save() { S.updatedAt = Date.now(); localStorage.setItem(KEY, JSON.stringify(S)); schedulePush(); }
@@ -780,7 +781,7 @@ const A = {
       <div class="theme-pick"><b>${ic('sun')} מראה</b><div class="seg">
         ${[['auto', 'לפי המכשיר'], ['light', 'בהיר'], ['dark', 'כהה']].map(([k, n]) => `<button data-a="theme-set" data-k="${k}" class="${(S.theme || 'auto') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
       ${faceBox()}
-      <button class="ghost" data-a="intro-sound">${ic(S.introSound ? 'sound' : 'mute')} סאונד בסרטון הפתיחה: ${S.introSound ? 'פעיל (קוטע מוזיקה)' : 'כבוי (לא קוטע מוזיקה)'}</button>
+      <button class="ghost" data-a="intro-sound">${ic(S.introSound ? 'sound' : 'mute')} סאונד בסרטון הפתיחה: ${S.introSound ? 'פעיל' : 'כבוי'}</button>
       <button class="ghost" data-a="music-open">${ic('music')} מוזיקה (Spotify / Apple Music)</button>
       <button class="ghost" data-a="science">${ic('book')} המדע שמאחורי התוכנית</button>
       ${syncSettingsHtml()}
