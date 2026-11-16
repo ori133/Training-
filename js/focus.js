@@ -29,7 +29,12 @@ function buildFlow(w) {
     f.push({ k: 'fin' });
   }
   f.push({ k: 'end' });
-  // זמני מנוחה אחרי כל צעד
+  fxRests(f, w);
+  return f;
+}
+
+// זמני מנוחה אחרי כל צעד (נקרא גם כשמוסיפים תרגיל באמצע אימון)
+function fxRests(f, w) {
   for (let i = 0; i < f.length - 1; i++) {
     const a = f[i], n = f[i + 1];
     if (a.k === 'warm' || a.k === 'test') continue;
@@ -37,7 +42,6 @@ function buildFlow(w) {
     if (a.k === 'set' && n.k === 'set' && n.b === a.b) a.after = n.s === a.s ? 15 : w.blocks[a.b].rest;
     else a.after = n.k === 'fin' ? 45 : 60;
   }
-  return f;
 }
 
 // ---------- עזרים ----------
@@ -50,7 +54,7 @@ function stepLabel(st) {
   if (st.k === 'warm') return { title: 'חימום: ' + WARMUP[st.i].n, say: 'חימום. ' + sayName(WARMUP[st.i].n) };
   if (st.k === 'set') {
     const e = fxEx(st), u = e.unit === 'sec' ? 'שניות' : 'חזרות';
-    return { title: `${e.v} — ${e.target[st.s]} ${u}`, say: `סט ${st.s + 1} מתוך ${e.target.length}. ${sayName(e.v)}. ${e.target[st.s]} ${u}` };
+    return { title: `${exLabel(e)} — ${e.target[st.s]} ${u}`, say: `סט ${st.s + 1} מתוך ${e.target.length}. ${sayName(e.v)}. ${e.target[st.s]} ${u}` };
   }
   if (st.k === 'skill') { const sk = SKILLS[w.blocks[st.b].skill]; return { title: 'סקיל: ' + sk.name, say: `בלוק סקיל, ${sk.name}. 6 דקות.` }; }
   if (st.k === 'emom') return { title: 'EMOM — 16 דקות', say: 'אמום, 16 דקות. כל דקה תחנה חדשה.' };
@@ -160,6 +164,7 @@ function fxTick(now) {
     ring(1 - (e % 60) / 60);
   }
   if ($f('fx-el')) $f('fx-el').textContent = mmss(Math.floor((now - w.started) / 1000));
+  if ($f('fx-left')) $f('fx-left').textContent = remainTxt(now);
 }
 function ring(frac) {
   const r = document.getElementById('fx-ring');
@@ -183,12 +188,15 @@ function renderFocus() {
   if (w.pick) {
     body = pickerHtml();
   } else if (w.phase === 'rest') {
-    const nx = stepLabel(st);
+    const nx = stepLabel(st), gk = stepGuide(st);
     body = `<div class="fx-body rest"><div class="fx-kicker">${w.restTotal <= 20 ? 'מעבר' : 'מנוחה'}</div>
       ${ringSvg(`<div id="fx-time" class="fx-time">${mmss(Math.ceil((w.restEnd - Date.now()) / 1000))}</div>`)}
-      <div class="fx-next"><span>הבא</span><b>${nx.title}</b></div></div>`;
+      <div class="fx-next"><span>הבא</span><b>${nx.title}</b>
+        ${gk.keys.length ? `${FG.mini(GUIDES[gk.keys[0]].fig)}<button class="fx-how" data-a="fx-guide">${ic('help')} איך עושים · הסבר מלא</button>` : ''}</div>
+      ${w.restTotal > 20 ? quoteHtml() : ''}</div>`;
     foot = `<button class="fx-btn" data-a="fx-back">${ic('undo')}חזרה</button>
       <button class="fx-btn" data-a="fx-add">${ic('plus')}15 שנ׳</button>
+      <button class="fx-btn" data-a="extra-open">${ic('dumbbell')}הוסף תרגיל</button>
       <button class="fx-btn" data-a="fx-skip">${ic('skip')}דלג</button>`;
   } else if (st.k === 'warm') {
     const x = WARMUP[st.i];
@@ -197,12 +205,13 @@ function renderFocus() {
       ${ringSvg(`<div id="fx-time" class="fx-time">${mmss(x.sec)}</div>`)}
       <div class="fx-hint">עובר לבד · נגיעה = הבא</div></button>`;
     foot = `<button class="fx-btn" data-a="fx-back" ${w.pos ? '' : 'disabled'}>${ic('undo')}חזרה</button>
+      <button class="fx-btn" data-a="fx-guide">${ic('help')}איך עושים</button>
       <button class="fx-btn" data-a="fx-skipwarm">${ic('skip')}דלג על החימום</button>`;
   } else if (st.k === 'set') {
     const e = fxEx(st), b = w.blocks[st.b], tgt = e.target[st.s];
     const dots = e.target.map((_, i) => `<i class="${e.done[i] != null ? 'on' : i === st.s ? 'cur' : ''}"></i>`).join('');
     const head = `<div class="fx-kicker">${b.title.replace(/ — .*/, '')} · תרגיל ${st.e + 1}</div>
-      <div class="fx-big">${e.v}</div><div class="fx-dots">${dots}</div>`;
+      <div class="fx-big">${exLabel(e)}</div><div class="fx-dots">${dots}</div>`;
     if (e.unit === 'sec') {
       body = `<button class="fx-body tap" data-a="fx-holdstop">${head}
         ${ringSvg(`<div id="fx-time" class="fx-time">${mmss(tgt)}</div><div class="fx-unit">שניות</div>`)}
@@ -213,10 +222,11 @@ function renderFocus() {
         <div class="fx-cue">${e.cue}</div>
         <div class="fx-press">${ic('check')}<span>גע כשסיימת את הסט</span></div></button>`;
       foot = `<button class="fx-btn" data-a="fx-back" ${w.pos ? '' : 'disabled'}>${ic('undo')}חזרה</button>
-        <button class="fx-btn" data-a="fx-less">${ic('minus')}עשיתי פחות</button>
-        <button class="fx-btn" data-a="fx-more">${ic('plus')}עשיתי יותר</button>`;
+        <button class="fx-btn" data-a="fx-guide">${ic('help')}איך עושים</button>
+        <button class="fx-btn" data-a="fx-less">${ic('minus')}פחות</button>
+        <button class="fx-btn" data-a="fx-more">${ic('plus')}יותר</button>`;
     }
-    if (e.unit === 'sec') foot = `<button class="fx-btn" data-a="fx-back">${ic('undo')}חזרה</button>`;
+    if (e.unit === 'sec') foot = `<button class="fx-btn" data-a="fx-back">${ic('undo')}חזרה</button><button class="fx-btn" data-a="fx-guide">${ic('help')}איך עושים</button>`;
   } else if (st.k === 'skill') {
     const b = w.blocks[st.b], sk = SKILLS[b.skill];
     body = `<button class="fx-body tap" data-a="fx-done"><div class="fx-kicker">${ic(sk.icon)} בלוק סקיל · ${sk.name}</div>
@@ -224,7 +234,7 @@ function renderFocus() {
       ${ringSvg(`<div id="fx-time" class="fx-time">${mmss((b.minutes || 6) * 60)}</div>`)}
       <div class="fx-cue">נסיונות קצרים ואיכותיים, 60–90 שניות מנוחה ביניהם. לא עד כישלון.</div>
       <div class="fx-hint">נגמר לבד · נגיעה = סיימתי מוקדם</div></button>`;
-    foot = `<button class="fx-btn" data-a="fx-back">${ic('undo')}חזרה</button>`;
+    foot = `<button class="fx-btn" data-a="fx-back">${ic('undo')}חזרה</button><button class="fx-btn" data-a="fx-guide">${ic('help')}איך עושים</button>`;
   } else if (st.k === 'emom') {
     const b = w.blocks[st.b];
     body = `<div class="fx-body"><div class="fx-kicker">${ic('timer')} EMOM · 16 דקות</div>
@@ -232,12 +242,14 @@ function renderFocus() {
       ${ringSvg(`<div id="fx-time" class="fx-time">5</div>`)}
       <div id="fx-sub" class="fx-hint">${b.stations.map(s => `${s.name} ${s.reps}`).join(' · ')}</div></div>`;
     foot = `<button class="fx-btn" data-a="fx-back">${ic('undo')}חזרה</button>
+      <button class="fx-btn" data-a="fx-guide">${ic('help')}התחנות</button>
       <button class="fx-btn" data-a="fx-emomstop">${ic('stop')}עצור כאן</button>`;
   } else if (st.k === 'fin') {
     body = `<button class="fx-body tap" data-a="fx-done"><div class="fx-kicker">${ic('wheel')} פיניש</div>
-      <div class="fx-big">${w.finisher.name}</div><div class="fx-cue lg">${w.finisher.desc}</div>
+      <div class="fx-big">${w.finisher.name}</div><div class="fx-cue lg">${w.finisher.desc}</div>${quoteHtml()}
       <div class="fx-press">${ic('check')}<span>גע כשסיימת</span></div></button>`;
     foot = `<button class="fx-btn" data-a="fx-back">${ic('undo')}חזרה</button>
+      <button class="fx-btn" data-a="fx-guide">${ic('help')}איך עושים</button>
       <button class="fx-btn" data-a="fx-finskip">${ic('skip')}בלי פיניש היום</button>`;
   } else if (st.k === 'test') {
     const v = +w.boss[st.key] || 0, best = Math.max(0, ...S.tests.map(t => t[st.key] || 0));
@@ -245,15 +257,17 @@ function renderFocus() {
       <div class="fx-cue">סט אחד מקסימלי. אחרי הסט מכוונים את המספר ושומרים. שיא קודם: ${best}</div>
       <div class="fx-stepper"><button data-a="fx-tdec">${ic('minus')}</button><b>${v}</b><button data-a="fx-tinc">${ic('plus')}</button></div>
       <button class="fx-save" data-a="fx-tsave">${ic('check')} שמור</button></div>`;
-    foot = `<button class="fx-btn" data-a="fx-back" ${w.pos ? '' : 'disabled'}>${ic('undo')}חזרה</button>`;
+    foot = `<button class="fx-btn" data-a="fx-back" ${w.pos ? '' : 'disabled'}>${ic('undo')}חזרה</button><button class="fx-btn" data-a="fx-guide">${ic('help')}איך עושים</button>`;
   } else if (st.k === 'end') {
     body = endHtml();
   }
 
   FX.innerHTML = `<div class="fx-top">
       <button class="fx-ic" data-a="fx-list" aria-label="רשימה מלאה">${ic('list')}</button>
-      <div class="fx-title">${w.type === 'BOSS' ? 'קרב בוס' : WORKOUTS[w.type].name.replace(/ — .*/, '')}<span id="fx-el">${mmss(Math.floor((Date.now() - w.started) / 1000))}</span></div>
-      <span class="fx-ic ghost-ic"></span></div>
+      <button class="fx-title" data-a="remain" aria-label="מה נשאר">${w.type === 'BOSS' ? 'קרב בוס' : WORKOUTS[w.type].name.replace(/ — .*/, '')}
+        <span><i id="fx-el">${mmss(Math.floor((Date.now() - w.started) / 1000))}</i> · <i id="fx-left" class="fx-left">${remainTxt(Date.now())}</i></span></button>
+      <div class="fx-tools"><button class="fx-ic" data-a="music-open" aria-label="מוזיקה">${ic('music')}</button>
+      <button class="fx-ic" data-a="fx-guide" aria-label="הסבר על התרגיל">${ic('help')}</button></div></div>
     <div class="fx-prog"><i style="width:${pct}%"></i></div>
     ${body}<div class="fx-foot">${foot}</div>`;
   fxTick(Date.now());
@@ -266,7 +280,7 @@ function pickerHtml() {
   if (sec) for (let v = 0; v <= tgt + 30; v += 5) vals.push(v);
   else if (p.more) for (let v = tgt + 1; v <= tgt + 15; v++) vals.push(v);
   else for (let v = 0; v <= (p.fix ? tgt + 8 : tgt - 1); v++) vals.push(v);
-  return `<div class="fx-body pick"><div class="fx-kicker">${e.v} · סט ${p.s + 1}</div>
+  return `<div class="fx-body pick"><div class="fx-kicker">${exLabel(e)} · סט ${p.s + 1}</div>
     <div class="fx-big">${p.more ? 'כמה עשית?' : p.fix ? 'כמה עשית בסט הזה?' : 'כמה הספקת?'}</div>
     <div class="fx-grid">${vals.map(v => `<button class="${v === tgt ? 'tgt' : ''}" data-a="fx-pickv" data-v="${v}">${v}</button>`).join('')}</div>
     <button class="fx-btn wide" data-a="fx-pickx">ביטול</button></div>`;
@@ -284,13 +298,13 @@ function endHtml() {
   w.blocks.forEach((b, bi) => {
     if (b.type !== 'superset') return;
     b.ex.forEach((e, ei) => {
-      rows += `<div class="fx-sum"><b>${e.v}</b><div class="fx-chips">${e.target.map((t, si) => {
+      rows += `<div class="fx-sum"><b>${exLabel(e)}</b><div class="fx-chips">${e.target.map((t, si) => {
         const d = e.done[si];
         return `<button class="${d == null ? 'no' : d >= t ? 'ok' : 'part'}" data-a="fx-fix" data-b="${bi}" data-e="${ei}" data-s="${si}">${d == null ? '–' : d}<small>/${t}</small></button>`;
       }).join('')}</div></div>`;
     });
   });
-  return `<div class="fx-body end"><div class="fx-kicker">${ic('flag')} סיימת!</div><div class="fx-big">איך היה?</div>
+  return `<div class="fx-body end"><div class="fx-kicker">${ic('flag')} סיימת!</div><div class="fx-big">איך היה?</div>${quoteHtml(true)}
     ${rows ? `<div class="fx-cue">טעית במספר? נוגעים בו ומתקנים.</div>${rows}` : ''}
     <div class="fx-fb">
       <button data-a="fb" data-v="easy">${ic('face-cool')}<b>קל מדי</b><small>קפיצה של 2 שלבים</small></button>

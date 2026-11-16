@@ -12,7 +12,7 @@ function defaultState() {
     onboarded: false, tracks: {}, history: [], tests: [], xp: 0,
     achievements: {}, claimed: {}, gtg: {}, waist: [], photoCount: 0, photoWeeks: {}, waistWeeks: {},
     skills: { active: 'muscleup', progress: {} },
-    rot: 0, blockCount: 0, current: null, tab: 'today', forceDate: null, updatedAt: 0, voice: true,
+    rot: 0, blockCount: 0, current: null, tab: 'today', forceDate: null, updatedAt: 0, voice: true, theme: 'auto',
   };
 }
 function load() {
@@ -171,15 +171,19 @@ function buildWorkout(type) {
   return w;
 }
 
+// שם תרגיל כולל משקל נוסף אם הוספת
+const exLabel = e => e.v + (e.kg ? ` · +${e.kg} ק״ג` : '');
+
 // ---------- סיום אימון ----------
 function completeWorkout(fb) {
   const w = S.current; const ups = [], downs = [];
   const totals = { pull: 0, push: 0, legs: 0, coreSec: 0 }; let setsHit = 0;
   for (const b of w.blocks) {
     if (b.type === 'superset') for (const e of b.ex) {
-      const g = TRACKS[e.track].group; const sum = e.done.reduce((a, x) => a + (x || 0), 0);
+      const TT = TRACKS[e.track]; const g = TT ? TT.group : e.group; const sum = e.done.reduce((a, x) => a + (x || 0), 0);
       if (e.unit === 'sec') totals.coreSec += sum; else if (totals[g] !== undefined) totals[g] += sum;
       e.done.forEach((x, i) => { if (x != null && x >= e.target[i]) setsHit++; });
+      if (!TT) continue; // תוספת שבחרת להיום — לא משנה את שלב ההתקדמות
       const hit = e.done.every((x, i) => x != null && x >= e.target[i]);
       const tr = S.tracks[e.track], n = TRACKS[e.track].stages.length;
       if (hit) {
@@ -346,12 +350,12 @@ function renderWorkout() {
   w.blocks.forEach((b, bi) => {
     if (b.type === 'superset') {
       h += `<div class="card"><h3>${b.title}</h3>
-        <p class="muted small">סט מתרגיל 1, מיד סט מתרגיל 2, ואז ${b.rest} שניות מנוחה. הטיימר מופעל לבד.</p>`;
+        <p class="muted small">${b.extra ? `תוספת להיום. ${b.rest} שניות מנוחה בין הסטים.` : `סט מתרגיל 1, מיד סט מתרגיל 2, ואז ${b.rest} שניות מנוחה. הטיימר מופעל לבד.`}</p>`;
       b.ex.forEach((e, ei) => {
         const T = TRACKS[e.track]; const u = e.unit === 'sec' ? 'שנ׳' : 'חזרות';
-        h += `<div class="ex"><div class="ex-name"><span class="num">${ei + 1}</span><div><b>${e.v}</b>
-          <div class="muted small">${e.v === T.name ? '' : T.name + ' · '}${e.target.length} סטים של ${e.target[0]} ${u}</div></div></div>
-          <details><summary>איך עושים נכון</summary><p>${e.cue}</p></details>`;
+        h += `<div class="ex"><div class="ex-name"><span class="num">${ei + 1}</span><div><b>${exLabel(e)}</b>
+          <div class="muted small">${!T || e.v === T.name ? '' : T.name + ' · '}${e.target.length} סטים של ${e.target[0]} ${u}</div></div></div>
+          <button class="ghost how" data-a="guide-ex" data-b="${bi}" data-e="${ei}">${ic('help')} איך עושים · איור · למה</button>`;
         e.target.forEach((t, si) => {
           const d = e.done[si] != null;
           h += `<div class="set ${d ? (e.done[si] >= t ? 'ok' : 'part') : ''}"><span class="sn">סט ${si + 1}</span>
@@ -389,7 +393,8 @@ function renderWorkout() {
     h += `<div class="card wheel"><h3>${ic('wheel')} פיניש</h3><div class="wheel-box">${w.finisher.name}</div><p class="muted">${w.finisher.desc}</p>
       ${w.finisherDone ? `<p class="ok-text">${ic('check')} הושלם! +30 XP</p>` : `<button class="ghost" data-a="fin-done">${ic('check')} סיימתי את הפיניש</button>`}</div>`;
   }
-  h += `<button class="cta" data-a="finish">${ic('flag')} סיים אימון</button><button class="link danger" data-a="cancel">בטל אימון</button>`;
+  h += `<button class="ghost" data-a="extra-open">${ic('plus')} הוסף תרגיל להיום</button>
+    <button class="cta" data-a="finish">${ic('flag')} סיים אימון</button><button class="link danger" data-a="cancel">בטל אימון</button>`;
   return h;
 }
 
@@ -771,6 +776,10 @@ const A = {
       <p><b>GTG:</b> סטים קלים לאורך ימי המנוחה מלמדים את מערכת העצבים את התנועה — הדרך המוכחת להעלות מתח מהר.</p>
       <p><b>קרב בוס:</b> כל 9 אימונים (3 שבועות) מבחן מקסימום. התוכנית מתכיילת לפי התוצאות.</p>
       <p><b>הכרס:</b> יורדת בעיקר מתזונה. חלבון בכל ארוחה, גירעון קלורי קטן, שינה וצעדים.</p></div></details>
+      <div class="theme-pick"><b>${ic('sun')} מראה</b><div class="seg">
+        ${[['auto', 'לפי המכשיר'], ['light', 'בהיר'], ['dark', 'כהה']].map(([k, n]) => `<button data-a="theme-set" data-k="${k}" class="${(S.theme || 'auto') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+      <button class="ghost" data-a="music-open">${ic('music')} מוזיקה (Spotify / Apple Music)</button>
+      <button class="ghost" data-a="science">${ic('book')} המדע שמאחורי התוכנית</button>
       ${syncSettingsHtml()}
       <button class="ghost" data-a="boss-now">${ic('boss')} קרב בוס עכשיו</button>
       <button class="ghost" data-a="export">${ic('download')} גיבוי נתונים</button>
