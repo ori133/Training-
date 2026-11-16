@@ -333,23 +333,22 @@ button.fx-body { font: inherit; }
 .fgf figcaption { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.25; }
 .fg { width: 100%; height: auto; display: block; border-radius: 14px; aspect-ratio: 6/5;
   background: radial-gradient(120% 90% at 50% 0%, var(--fgbg1), var(--fgbg2)); border: 1px solid var(--line); }
-.fg .fg-o { fill: none; stroke: var(--fgout); stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
-.fg .fg-o.fg-torso { stroke-width: 12.5; }
-.fg .fg-b { fill: none; stroke: var(--fgbody); stroke-width: 5.2; stroke-linecap: round; stroke-linejoin: round; }
-.fg .fg-b.fg-torso { stroke-width: 8.2; }
-.fg .fg-b.fg-far { stroke: var(--fgfar); }
-.fg .fg-hl { fill: none; stroke: var(--acc); stroke-opacity: .8; stroke-width: 15; stroke-linecap: round; stroke-linejoin: round; }
+.fg .fg-ol polygon, .fg .fg-ol circle { fill: var(--fgout); stroke: var(--fgout); stroke-width: 3.6; stroke-linejoin: round; }
+.fg .fg-fl polygon, .fg .fg-fl circle { fill: var(--fgbody); stroke: none; }
+.fg .fg-fl.fg-far polygon, .fg .fg-fl.fg-far circle { fill: var(--fgfar); }
+.fg .fg-hl polygon, .fg .fg-hl circle { fill: var(--acc); fill-opacity: .85; stroke: none; }
 .fg .fg-end { fill: var(--fgbody); stroke: var(--fgout); stroke-width: 1.4; }
-.fg .fg-h { fill: var(--fgbody); stroke: var(--fgout); stroke-width: 2.2; }
-.fg .fg-eye { fill: var(--fgout); }
-.fg .fg-hr { fill: var(--fgbody); stroke: var(--fgbody); stroke-width: 1; }
-.fg .fg-hr.bad { fill: var(--danger); }
+.fg .fg-neck { stroke: var(--fgbody); stroke-width: 5.4; stroke-linecap: round; }
+.fg .fg-h { fill: var(--fgbody); stroke: var(--fgout); stroke-width: 1.6; }
+.fg .fg-hair { fill: var(--fgout); }
+.fg.raw .fg-b { stroke: var(--fgbody); stroke-width: 6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.fg.raw .fg-h { fill: var(--fgbody); stroke: var(--fgout); stroke-width: 1.6; }
 .fg .fg-p path, .fg .fg-p circle { fill: none; stroke: var(--fgprop); stroke-width: 2; stroke-linecap: round; }
 .fg .fg-p .t { stroke: var(--acc); stroke-width: 3.4; }
 .fg .a { stroke: var(--teal); fill: none; stroke-width: 2.4; stroke-linecap: round; }
 .fg .tx { fill: var(--acc); font-size: 9px; font-weight: 700; }
-.fg.bad .fg-b, .fg.bad .fg-h, .fg.bad .fg-end { stroke: var(--danger); }
-.fg.bad .fg-b { stroke: var(--danger); } .fg.bad .fg-h, .fg.bad .fg-end { fill: var(--danger); }
+.fg.bad .fg-fl polygon, .fg.bad .fg-fl circle, .fg.bad .fg-h, .fg.bad .fg-end { fill: var(--danger); }
+.fg.bad .fg-neck { stroke: var(--danger); }
 .fg-anim { width: 100%; max-width: 280px; margin: 4px auto 8px; } .fg-anim.mini { max-width: 190px; margin: 2px auto; }
 .fg-anim .fg { aspect-ratio: 6/5; }
 .myp { margin-top: 12px; } .myp h4 { margin-bottom: 6px; }
@@ -364,9 +363,6 @@ button.fx-body { font: inherit; }
 .myp-anim { position: relative; width: 100%; max-width: 220px; aspect-ratio: 3/4; margin: 8px auto; border-radius: 14px; overflow: hidden; background: #000; }
 .myp-anim img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .5s; }
 .myp-anim img.on { opacity: 1; }
-.face-pick { display: flex; align-items: center; gap: 12px; text-align: start; margin: 10px 0; background: var(--card2); border-radius: 14px; padding: 10px 12px; }
-.face-pick img, .face-pick .ph { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: var(--card); border: 1.5px solid var(--line); flex-shrink: 0; display: grid; place-items: center; }
-.face-pick .ghost { margin: 0; width: auto; padding: 8px 14px; }
 .fgm { display: flex; gap: 6px; justify-content: center; width: 100%; }
 .fgm .fg { width: 46%; max-width: 150px; }
 

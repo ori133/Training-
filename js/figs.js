@@ -19,7 +19,6 @@ const FG = (() => {
     if (e) return [a, e, b];
     return ik(a, b, l1, l2, s);
   }
-  let UID = 0;
   const HL = {};
   const hlSet = (keys, parts) => keys.split(' ').forEach(k => { HL[k] = parts; });
   hlSet('pull pullNeg pullWide pullPause archerPull chin chinNeg chinSlow scap muscleup frontlever dbRow', ['torso', 'arms']);
@@ -28,43 +27,55 @@ const FG = (() => {
   hlSet('kneeRaise legRaise t2b wipers plank hollow lsit lsitTuck mountain', ['torso']);
   hlSet('dbCurl hangPassive armCircles handstand', ['arms']);
   hlSet('burpee', ['legs', 'torso', 'arms']);
-  const poly = pts => `points="${pl(pts)}"`;
-  function headSvg(h, face, bad) {
-    const x = h[0].toFixed(1), y = h[1].toFixed(1);
-    if (face) {
-      const id = 'hc' + (UID++), r = 8;
-      return `<defs><clipPath id="${id}"><circle cx="${x}" cy="${y}" r="${r}"/></clipPath></defs>
-        <circle class="fg-hr${bad ? ' bad' : ''}" cx="${x}" cy="${y}" r="${r + 1.4}"/>
-        <image href="${face}" x="${(h[0] - r).toFixed(1)}" y="${(h[1] - r).toFixed(1)}" width="${r * 2}" height="${r * 2}" clip-path="url(#${id})" preserveAspectRatio="xMidYMid slice"/>`;
-    }
-    return `<circle class="fg-h" cx="${x}" cy="${y}" r="6.4"/><circle class="fg-eye" cx="${(h[0] + 2.4).toFixed(1)}" cy="${(h[1] - 0.6).toFixed(1)}" r="1.1"/>`;
+
+  // ---- גוף שרירי: כל עצם היא צורה מתרחבת (פרופיל רדיוסים לאורכה) ----
+  const f1 = n => n.toFixed(1);
+  function bone(a, b, prof, grow = 0) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+    const at = t => { for (let i = 1; i < prof.length; i++) if (t <= prof[i][0]) { const [t0, r0] = prof[i - 1], [t1, r1] = prof[i]; return r0 + (r1 - r0) * ((t - t0) / (t1 - t0 || 1)); } return prof[prof.length - 1][1]; };
+    const ts = [0, .12, .25, .4, .55, .7, .85, 1], l = [], r = [];
+    ts.forEach(t => { const R = at(t) + grow, cx = a[0] + dx * t, cy = a[1] + dy * t; l.push(`${f1(cx + nx * R)},${f1(cy + ny * R)}`); r.push(`${f1(cx - nx * R)},${f1(cy - ny * R)}`); });
+    const cap = (p, R) => `<circle cx="${f1(p[0])}" cy="${f1(p[1])}" r="${f1(R + grow)}"/>`;
+    return { poly: `<polygon points="${l.concat(r.reverse()).join(' ')}"/>`, caps: cap(a, prof[0][1]) + cap(b, prof[prof.length - 1][1]) };
   }
-  function figure(f, hl, noFace) {
-    if (f.raw) return `<svg viewBox="${f.vb || '0 0 120 100'}" class="fg" aria-hidden="true"><g class="fg-p">${f.props || ''}</g>${f.raw}</svg>`;
+  // פרופילים: [מיקום 0..1, רדיוס]
+  const UPARM = [[0, 4.3], [.3, 4.9], [.55, 4.4], [1, 3.2]];   // כתף ודו-ראשי/תלת-ראשי
+  const FOREARM = [[0, 3.7], [.3, 4], [1, 2.6]];
+  const THIGH = [[0, 6.2], [.4, 6.4], [1, 4.2]];
+  const CALF = [[0, 4.1], [.3, 4.8], [1, 2.6]];
+  const TORSO = [[0, 6.2], [.25, 7.8], [.7, 6.2], [1, 5.2]];       // חזה רחב, מותן צר
+  function limbShapes(pts, p1, p2, grow) {
+    const u = bone(pts[0], pts[1], p1, grow), v = bone(pts[1], pts[2], p2, grow);
+    return u.poly + v.poly + u.caps + v.caps;
+  }
+  function figure(f, hl) {
+    if (f.raw) return `<svg viewBox="${f.vb || '0 0 120 100'}" class="fg raw" aria-hidden="true"><g class="fg-p">${f.props || ''}</g>${f.raw}</svg>`;
     const n = f.n, p = f.p;
     const L = Math.hypot(n[0] - p[0], n[1] - p[1]) || 1;
     const ux = (n[0] - p[0]) / L, uy = (n[1] - p[1]) / L;
     let h = f.hd;
-    if (!h) { h = [n[0] + ux * 10.5, n[1] + uy * 10.5]; if (f.w && f.w[1] < n[1] - 10 && !f.f2) h = [h[0] + 6, h[1] + 1]; }
+    if (!h) { h = [n[0] + ux * 11, n[1] + uy * 11]; if (f.w && f.w[1] < n[1] - 10 && !f.f2) h = [h[0] + 6, h[1] + 1]; }
     const arm = f.w ? limb(n, f.w, AL, AL, f.eb == null ? 1 : f.eb, f.e) : null;
     const arm2 = f.w2 ? limb(n, f.w2, AL, AL, f.eb2 == null ? 1 : f.eb2, f.e2) : null;
     const leg = f.f ? limb(p, f.f, LL, LL, f.kb == null ? -1 : f.kb) : null;
     const leg2 = f.f2 ? limb(p, f.f2, LL, LL, f.kb2 == null ? -1 : f.kb2) : null;
-    const torso = [p, n];
-    let g = '';
     const parts = hl || [];
-    if (parts.includes('arms')) [arm, arm2].forEach(a => { if (a) g += `<polyline class="fg-hl" ${poly(a)}/>`; });
-    if (parts.includes('legs')) [leg, leg2].forEach(a => { if (a) g += `<polyline class="fg-hl" ${poly(a)}/>`; });
-    if (parts.includes('torso')) g += `<polyline class="fg-hl" ${poly(torso)}/>`;
-    const seg = (pts, cls) => `<polyline class="fg-o ${cls}" ${poly(pts)}/><polyline class="fg-b ${cls}" ${poly(pts)}/>`;
-    let body = '';
-    if (arm2) body += seg(arm2, 'fg-far');
-    if (leg2) body += seg(leg2, 'fg-far');
-    body += seg(torso, 'fg-torso');
-    if (leg) body += seg(leg, '');
-    if (arm) body += seg(arm, '');
-    const ends = [arm && arm[2], arm2 && arm2[2], leg && leg[2], leg2 && leg2[2]].filter(Boolean).map(e => `<circle class="fg-end" cx="${e[0].toFixed(1)}" cy="${e[1].toFixed(1)}" r="3.4"/>`).join('');
-    return `<svg viewBox="${f.vb || '0 0 120 100'}" class="fg${f.bad ? ' bad' : ''}" aria-hidden="true"><g class="fg-p">${f.props || ''}</g>${g}${body}${ends}${headSvg(h, noFace ? null : FG.faceUrl, f.bad)}${f.extra || ''}</svg>`;
+    const armS = (a, glow) => a ? limbShapes(a, UPARM, FOREARM, glow) : '';
+    const legS = (a, glow) => a ? limbShapes(a, THIGH, CALF, glow) : '';
+    const torsoS = glow => { const t = bone(p, n, TORSO.map(([t, r]) => [1 - t, r]).reverse(), glow); return t.poly + t.caps; };
+    const layer = (shapes, cls = '') => shapes ? `<g class="fg-ol">${shapes}</g><g class="fg-fl ${cls}">${shapes}</g>` : '';
+    let g = '';
+    if (parts.includes('arms')) g += `<g class="fg-hl">${armS(arm, 3.4)}${armS(arm2, 3.4)}</g>`;
+    if (parts.includes('legs')) g += `<g class="fg-hl">${legS(leg, 3.4)}${legS(leg2, 3.4)}</g>`;
+    if (parts.includes('torso')) g += `<g class="fg-hl">${torsoS(3.4)}</g>`;
+    const delt = `<circle cx="${f1(n[0])}" cy="${f1(n[1])}" r="5.2"/>`;
+    let body = layer(armS(arm2, 0), 'fg-far') + layer(legS(leg2, 0), 'fg-far') + layer(torsoS(0) + delt) + layer(legS(leg, 0)) + layer(armS(arm, 0));
+    // כפות
+    const ends = [arm && arm[2], arm2 && arm2[2], leg && leg[2], leg2 && leg2[2]].filter(Boolean).map(e => `<circle class="fg-end" cx="${f1(e[0])}" cy="${f1(e[1])}" r="3.2"/>`).join('');
+    // צוואר וראש
+    const neck = `<line class="fg-neck" x1="${f1(n[0])}" y1="${f1(n[1])}" x2="${f1(h[0])}" y2="${f1(h[1])}"/>`;
+    const head = `<circle class="fg-h" cx="${f1(h[0])}" cy="${f1(h[1])}" r="6.4"/><path class="fg-hair" d="M${f1(h[0] - 6.2)} ${f1(h[1] - 0.5)}a6.3 6.3 0 0 1 12.4 0c-3-2.6-9-2.6-12.4 0z"/>`;
+    return `<svg viewBox="${f.vb || '0 0 120 100'}" class="fg${f.bad ? ' bad' : ''}" aria-hidden="true"><g class="fg-p">${f.props || ''}</g>${g}${body}${ends}${neck}${head}${f.extra || ''}</svg>`;
   }
 
   // ---- ציוד וחצים ----
@@ -358,5 +369,5 @@ const FG = (() => {
   }
   const kick = () => { if (!raf) raf = requestAnimationFrame(loop); };
   const keys = () => Object.keys(FIGS);
-  return { strip, mini, anim, kick, keys, figure, frames, good, HL, faceUrl: null };
+  return { strip, mini, anim, kick, keys, figure, frames, good, HL, };
 })();
