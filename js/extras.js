@@ -301,11 +301,12 @@ let mypPending = null;
 const hiddenInput = id => { let i = document.getElementById(id); if (!i) { i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; i.id = id; i.hidden = true; document.body.appendChild(i); } return i; };
 Object.assign(A, {
   'face-add'() { hiddenInput('face-in').click(); },
-  'face-del'() { localStorage.removeItem('pt_face'); FG.faceUrl = null; A.settings(); if (S.current) renderFocus(); },
+  'face-del'() { localStorage.removeItem('pt_face'); FG.faceUrl = null; setMeDirty('face', 'del'); A.settings(); if (S.current) renderFocus(); },
   'myp-add'(t) { mypPending = { k: t.dataset.k, i: +t.dataset.i }; hiddenInput('myp-in').click(); },
   async 'myp-del'(t) {
     const k = t.dataset.k, i = +t.dataset.i; if (!confirm('למחוק את התמונה?')) return;
     try { await exdb.del(`${k}:${i}`); } catch (e) {}
+    setMeDirty(`${k}_${i}`, 'del');
     if (MYP[k] && MYP[k][i]) { URL.revokeObjectURL(MYP[k][i]); MYP[k][i] = null; }
     refreshMyp(k);
   },
@@ -314,20 +315,64 @@ Object.assign(A, {
 document.addEventListener('change', async ev => {
   const f = ev.target.files && ev.target.files[0]; if (!f) return;
   if (ev.target.id === 'face-in') {
-    try { FG.faceUrl = await cropFace(f); localStorage.setItem('pt_face', FG.faceUrl); A.settings(); if (S.current) renderFocus(); toast(`${ic('check-circle')} התמונה נשמרה`); }
+    try { FG.faceUrl = await cropFace(f); localStorage.setItem('pt_face', FG.faceUrl); setMeDirty('face', 1); A.settings(); if (S.current) renderFocus(); toast(`${ic('check-circle')} התמונה נשמרה`); }
     catch (e) { toast('לא הצלחתי לקרוא את התמונה'); }
     ev.target.value = '';
   }
   if (ev.target.id === 'myp-in' && mypPending) {
     const { k, i } = mypPending; mypPending = null;
     try {
-      const blob = await compress(f); await exdb.put(`${k}:${i}`, blob);
+      const blob = await compress(f); await exdb.put(`${k}:${i}`, blob); setMeDirty(`${k}_${i}`, 1);
       if (MYP[k] && MYP[k][i]) URL.revokeObjectURL(MYP[k][i]);
       (MYP[k] = MYP[k] || [])[i] = URL.createObjectURL(blob); refreshMyp(k); toast(`${ic('check-circle')} נשמר`);
     } catch (e) { toast('שמירת התמונה נכשלה'); }
     ev.target.value = '';
   }
 });
+// ---------- סנכרון התמונות שלי לריפו הפרטי (me/face.jpg ו-me/ex/*.jpg) ----------
+const meDirty = () => { try { return JSON.parse(localStorage.getItem('pt_me_dirty')) || {}; } catch (e) { return {}; } };
+function setMeDirty(id, v) { const d = meDirty(); d[id] = v; localStorage.setItem('pt_me_dirty', JSON.stringify(d)); if (typeof schedulePush === 'function') { dirty = true; schedulePush(); } }
+const blobToDataUrl = blob => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); });
+const dataUrlToB64 = u => u.split(',')[1];
+async function meUpload(path, b64, remote) {
+  const body = { message: 'התמונות שלי', content: b64 }; if (remote) body.sha = remote.sha;
+  await gh('/contents/' + path, { method: 'PUT', body: JSON.stringify(body) });
+}
+async function syncMe() {
+  if (!syncOn()) return;
+  const dirtyMap = meDirty();
+  const root = (await gh('/contents/me')) || [];
+  const exList = (await gh('/contents/me/ex')) || [];
+  const rface = root.find(f => f.name === 'face.jpg');
+  // פנים
+  if (dirtyMap.face === 'del') { if (rface) await gh('/contents/me/face.jpg', { method: 'DELETE', body: JSON.stringify({ message: 'הסרת תמונה', sha: rface.sha }) }); }
+  else if (dirtyMap.face && FG.faceUrl) await meUpload('me/face.jpg', dataUrlToB64(FG.faceUrl), rface);
+  else if (rface && rface.sha !== localStorage.getItem('pt_face_sha') && !dirtyMap.face) {
+    const r = await ghFetch('/contents/me/face.jpg', {}, 'application/vnd.github.raw+json');
+    if (r) { FG.faceUrl = await blobToDataUrl(await r.blob()); localStorage.setItem('pt_face', FG.faceUrl); }
+  }
+  if (rface || dirtyMap.face) { const nr = (await gh('/contents/me')) || []; const f = nr.find(x => x.name === 'face.jpg'); if (f) localStorage.setItem('pt_face_sha', f.sha); }
+  // תמונות לתרגילים
+  const have = new Set();
+  for (const [id, v] of Object.entries(dirtyMap)) {
+    if (id === 'face') continue;
+    const [k, i] = id.split('_'); const rem = exList.find(f => f.name === id + '.jpg');
+    if (v === 'del') { if (rem) await gh('/contents/me/ex/' + id + '.jpg', { method: 'DELETE', body: JSON.stringify({ message: 'מחיקת תמונה', sha: rem.sha }) }); }
+    else { const rec = (await exdb.all()).find(r => r.id === `${k}:${i}`); if (rec) await meUpload('me/ex/' + id + '.jpg', await blobB64(rec.blob), rem); }
+    have.add(id);
+  }
+  let added = 0;
+  const localIds = new Set((await exdb.all()).map(r => r.id.replace(':', '_')));
+  for (const f of exList) {
+    const id = f.name.replace(/\.jpg$/, '');
+    if (have.has(id) || localIds.has(id)) continue;
+    const r = await ghFetch('/contents/me/ex/' + f.name, {}, 'application/vnd.github.raw+json'); if (!r) continue;
+    const [k, i] = id.split('_'), blob = await r.blob();
+    await exdb.put(`${k}:${i}`, blob); (MYP[k] = MYP[k] || [])[+i] = URL.createObjectURL(blob); added++;
+  }
+  localStorage.removeItem('pt_me_dirty');
+  if (added || FG.faceUrl) { if (S.current) renderFocus(); }
+}
 loadMyp();
 window.addEventListener('DOMContentLoaded', () => { applyTheme(); });
 applyTheme();

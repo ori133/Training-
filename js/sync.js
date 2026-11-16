@@ -89,6 +89,7 @@ async function syncPhotos() {
     await idb.add({ date, blob: await r.blob(), remote: path }); added++;
   }
   if (added && S.tab === 'progress') loadPhotos();
+  if (typeof syncMe === 'function') await syncMe();
 }
 async function deleteRemote(path) {
   const f = await gh('/contents/' + path);
