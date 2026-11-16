@@ -781,7 +781,6 @@ const A = {
       <div class="theme-pick"><b>${ic('sun')} מראה</b><div class="seg">
         ${[['auto', 'לפי המכשיר'], ['light', 'בהיר'], ['dark', 'כהה']].map(([k, n]) => `<button data-a="theme-set" data-k="${k}" class="${(S.theme || 'auto') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
       ${faceBox()}
-      <button class="ghost" data-a="intro-sound">${ic(S.introSound ? 'sound' : 'mute')} סאונד בסרטון הפתיחה: ${S.introSound ? 'פעיל' : 'כבוי'}</button>
       <button class="ghost" data-a="music-open">${ic('music')} מוזיקה (Spotify / Apple Music)</button>
       <button class="ghost" data-a="science">${ic('book')} המדע שמאחורי התוכנית</button>
       ${syncSettingsHtml()}

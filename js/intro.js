@@ -45,7 +45,6 @@ function introVideo() {
 }
 // "פותח" את הסאונד בתוך נגיעה של המשתמש, בשקט, כדי שבכניסה הבאה הסרטון יתחיל ישר עם סאונד
 function unlockIntroSound(e) {
-  if (!S.introSound) return; // בלי סאונד אוטומטי — לא נוגעים בשמע של ספוטיפיי/אפל מיוזיק
   if (introUnlocked || !introVid || !introVid.src) return;
   if (introEl && introEl.classList.contains('blocked')) return; // הנגיעה הזאת עצמה תפעיל את הסרטון
   if (e && e.target.closest && e.target.closest('.intro-snd')) return;
@@ -87,7 +86,7 @@ async function showIntro() {
   v.currentTime = 0;
   el.classList.add('ready');
   // 1. מנסים עם סאונד  2. אם חסום: בלי סאונד (אייפון מרשה)  3. אם גם זה חסום: נגיעה אחת מפעילה
-  setMuted(!S.introSound); upd();
+  setMuted(false); upd();
   try { await v.play(); }
   catch (e) {
     if (introEl !== el) return;
