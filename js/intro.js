@@ -64,6 +64,7 @@ async function showIntro() {
     <div class="intro-hint">נגיעה במסך כדי להמשיך</div>
     <div class="intro-play">${ic('play')}</div>
     <button class="intro-snd" aria-label="סאונד"></button>`;
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {} // הסרטון משמיע גם כשמתג השקט דלוק
   const v = introVideo(), btn = el.querySelector('.intro-snd');
   el.prepend(v);
   document.body.appendChild(el);
@@ -107,6 +108,7 @@ function setMuted(m) {
 function closeIntro() {
   if (!introEl) return;
   const el = introEl; introEl = null;
+  try { if (navigator.audioSession) navigator.audioSession.type = 'ambient'; } catch (e) {}
   if (introVid) introVid.pause();
   el.classList.add('out');
   setTimeout(() => el.remove(), 350);

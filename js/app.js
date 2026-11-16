@@ -559,7 +559,7 @@ function confetti() {
 // ============================================================
 let actx = null;
 function unlockAudio() {
-  try { if (navigator.audioSession) navigator.audioSession.type = 'ambient'; } catch (e) {}
+  try { if (navigator.audioSession && !document.getElementById('intro')) navigator.audioSession.type = 'ambient'; } catch (e) {}
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
   if (actx && actx.state === 'suspended') actx.resume();
 }
