@@ -462,3 +462,35 @@ cite { display: block; font-size: 11.5px; color: var(--muted); font-style: norma
 [data-theme="light"] .rm-row.cur { background: rgba(232,96,10,.1); }
 [data-theme="light"] .cta { color: #fff; } [data-theme="light"] .cta.alt { color: #06403b; }
 [data-theme="light"] .seg button.on { color: #fff; }
+
+#tip-p, #tip-c { transition: opacity .45s; }
+.tip b small { font-weight: 500; }
+.tip cite { margin-top: 6px; }
+
+/* מסך סט: איור + טיפים מתחלפים */
+.fx-body.compact { gap: 6px; padding: 12px 14px; }
+.fx-body.compact .fx-big { font-size: clamp(20px, 6vw, 26px); }
+.fx-body.compact .fx-dots { margin: 0; }
+.fx-body.compact .fx-reps b { font-size: clamp(72px, 22vw, 104px); }
+.fx-body.compact .fx-reps span { font-size: 16px; margin-top: 2px; }
+.fx-body.compact .fx-clock { width: min(40vw, 150px); }
+.fx-body.compact .fx-time { font-size: clamp(36px, 11vw, 48px); }
+.fx-body.compact .fx-press { margin-top: 2px; padding: 10px 22px; font-size: 16px; }
+.fg-anim.fx { max-width: min(46vw, 190px, 24vh * 1.2); margin: 0 auto; }
+.fg-anim.fx .fg { aspect-ratio: 6/5; }
+.fx-tip { width: 100%; max-width: 400px; min-height: 64px; background: var(--card2); border-radius: 14px; padding: 8px 12px; text-align: start; transition: opacity .28s, transform .28s;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.fx-tip.out { opacity: 0; transform: translateY(4px); }
+.fx-tip.big { min-height: 88px; }
+.tp-k { font-size: 11.5px; font-weight: 800; color: var(--teal); letter-spacing: .2px; }
+.tp-t { font-size: 14px; line-height: 1.35; color: var(--text); }
+.fx-tip cite { margin-top: 1px; font-size: 11px; }
+.fx-fin { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; }
+.fx-time.sm { font-size: 44px; }
+button.fx-press { font: inherit; font-weight: 800; border: 0; cursor: pointer; }
+.fx-fin .fx-save { padding: 12px; font-size: 17px; }
+.fx-body { justify-content: flex-start; }
+.fx-body > :first-child { margin-top: auto; } .fx-body > :last-child { margin-bottom: auto; }
+.rest .fx-clock { width: min(38vw, 150px); } .rest .fx-time { font-size: clamp(36px, 11vw, 48px); }
+.fx-next .fg-anim.mini { max-width: 150px; }
+.fx-body.rest { gap: 8px; }

@@ -81,6 +81,7 @@ function openGuide(info) {
   const ctx = (info.facts || info.ctx || info.dose) ? `<div class="why ctx"><h4>${ic('book')} למה כאן, ככה ובזמן הזה</h4>
     ${info.facts ? `<p><b>${info.facts}</b></p>` : ''}${info.ctx ? `<p>${info.ctx}</p>` : ''}${info.dose ? `<p>${info.dose}</p>` : ''}
     <button class="link" data-a="science">כל המדע שמאחורי התוכנית</button></div>` : '';
+  cnt('guides');
   const el = guideEl();
   el.innerHTML = `<div class="gd-box"><div class="gd-top"><b>${info.title || GUIDES[info.keys[0]].n}</b>
     <button class="fx-ic" data-a="guide-close" aria-label="סגור">${ic('x')}</button></div>
@@ -184,7 +185,7 @@ function addExtra() {
   const lastWarm = w.flow.reduce((a, x, i) => x.k === 'warm' ? i : a, -1);
   if (idx <= lastWarm) idx = lastWarm + 1;
   w.flow.splice(idx, 0, ...steps);
-  fxRests(w.flow, w); save(); closeModal(); render(); toast(`${ic('check-circle')} נוסף: ${it.n}`);
+  fxRests(w.flow, w); save(); closeModal(); render(); cnt('extras'); toast(`${ic('check-circle')} נוסף: ${it.n}`);
 }
 
 // ---------- מוזיקה (Spotify / Apple Music) ----------
@@ -236,7 +237,7 @@ Object.assign(A, {
   science() { closeGuide(); showModal(scienceHtml()); },
   'theme-toggle'() { S.theme = resolvedTheme() === 'light' ? 'dark' : 'light'; save(); applyTheme(); },
   'theme-set'(t) { S.theme = t.dataset.k; save(); applyTheme(); A.settings(); },
-  'music-open'() { closeModal(); ensureMusic().classList.add('open'); },
+  'music-open'() { closeModal(); ensureMusic().classList.add('open'); cnt('music'); },
   'music-close'() { document.getElementById('music').classList.remove('open'); },
   'music-set'() {
     const m = parseMusic(document.getElementById('mu-in').value);

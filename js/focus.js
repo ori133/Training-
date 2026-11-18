@@ -44,6 +44,46 @@ function fxRests(f, w) {
   }
 }
 
+// ---------- טיפים וחיזוקים שמתחלפים תוך כדי ----------
+const CHEERS = ['עוד קצת, אתה כמעט שם.', 'כל סט מצטבר. תמשיך.', 'הטכניקה לפני המספר.', 'נשימה עמוקה ומתחילים.'];
+function fxProgress() { const w = S.current; return w && w.flow ? w.pos / Math.max(1, w.flow.length - 1) : 0; }
+// רשימת הודעות לצעד: טעויות נפוצות, טיפים, ובחלק האחרון של האימון גם משפטי עידוד ממחקרים
+function fxPool(st) {
+  const g = stepGuide(st), out = [];
+  const gd = g.keys.length ? GUIDES[g.keys[0]] : null;
+  if (gd) {
+    gd.bad.forEach(x => out.push({ k: 'טעות נפוצה', t: x }));
+    gd.steps.slice(1).forEach(x => out.push({ k: 'טיפ', t: x }));
+    out.push({ k: 'אם קשה מדי', t: gd.easy }, { k: 'אם קל מדי', t: gd.hard });
+  }
+  const late = fxProgress() >= 0.6;
+  const q = late ? QUOTES_END : QUOTES_MID, w = S.current;
+  const res = [];
+  const n = Math.max(out.length, 1);
+  for (let i = 0; i < n; i++) {
+    if (out[i]) res.push(out[i]);
+    if (late || i % 2 === 1) { const qq = q[(w.pos * 3 + i) % q.length]; res.push({ k: late ? 'כמעט שם' : 'מחקר', t: qq[0], s: qq[1] }); }
+    if (late && i % 3 === 2) res.push({ k: 'חזק', t: CHEERS[(w.pos + i) % CHEERS.length] });
+  }
+  return res.length ? res : [{ k: 'טיפ', t: CHEERS[0] }];
+}
+const tipHtml = o => `<span class="tp-k">${o.k}</span><span class="tp-t">${o.t}</span>${o.s ? `<cite>${o.s}</cite>` : ''}`;
+function fxTipTick(now) {
+  const w = S.current, el = document.getElementById('fx-tip'); if (!el) return;
+  const st = fxStep(), key = w.pos + ':' + st.k + ':' + w.phase;
+  if (fxMem.poolKey !== key) { fxMem.poolKey = key; fxMem.pool = fxPool(st); fxMem.tipT0 = now; }
+  const idx = Math.floor((now - fxMem.tipT0) / 7000) % fxMem.pool.length;
+  if (el.dataset.i === String(idx)) return;
+  if (el.dataset.i === undefined) { el.dataset.i = idx; el.innerHTML = tipHtml(fxMem.pool[idx]); return; }
+  el.dataset.i = idx; el.classList.add('out');
+  setTimeout(() => { const e2 = document.getElementById('fx-tip'); if (e2) { e2.innerHTML = tipHtml(fxMem.pool[idx]); e2.classList.remove('out'); } }, 280);
+}
+
+function figHtml(st) {
+  const g = stepGuide(st);
+  return g.keys.length ? FG.anim(GUIDES[g.keys[0]].fig, 'fx') : '';
+}
+
 // ---------- עזרים ----------
 const fxStep = () => S.current.flow[S.current.pos];
 const fxEx = st => S.current.blocks[st.b].ex[st.e];
@@ -66,7 +106,7 @@ function stepLabel(st) {
 // ---------- מעברים ----------
 function fxEnter(silent) {
   const w = S.current, st = fxStep(), now = Date.now();
-  w.phase = 'go'; w.pick = null; w.t0 = now; fxMem.beepAt = null; fxMem.said10 = null;
+  w.phase = 'go'; w.pick = null; w.t0 = now; w.finT = 0; fxMem.beepAt = null; fxMem.said10 = null; fxMem.poolKey = null;
   if (st.k === 'set' && isHold(st)) w.t0 = now + 5000; // 5 שניות להיכנס לתנוחה
   if (st.k === 'emom') { const b = w.blocks[st.b]; b.startAt = now + 5000; b.roundsDone = 0; b.stopped = false; lastEmomMin = {}; }
   if (st.k === 'test' && w.boss[st.key] === '') w.boss[st.key] = Math.max(0, ...S.tests.map(t => t[st.key] || 0));
@@ -110,7 +150,7 @@ function fxTick(now) {
   const w = S.current;
   if (!w || !w.flow || w.list) return;
   const st = fxStep(), $f = id => document.getElementById(id);
-  const countBeeps = left => { if (left <= 3 && left > 0 && fxMem.beepAt !== left) { fxMem.beepAt = left; beep(660, 0.08); } };
+  const countBeeps = left => { if (left <= 3 && left > 0 && fxMem.beepAt !== left) { fxMem.beepAt = left; beep(587, 0.1, 0, 0.2); } };
   if (w.phase === 'rest') {
     const left = Math.ceil((w.restEnd - now) / 1000);
     if (left <= 0) { beepEnd(); fxEnter(); return; }
@@ -120,7 +160,7 @@ function fxTick(now) {
     ring(left / w.restTotal);
   } else if (st.k === 'warm') {
     const left = Math.ceil((w.t0 + WARMUP[st.i].sec * 1000 - now) / 1000);
-    if (left <= 0) { beep(1320, 0.25); fxNext(); return; }
+    if (left <= 0) { chime(); fxNext(); return; }
     countBeeps(left);
     if ($f('fx-time')) $f('fx-time').textContent = mmss(left);
     ring(left / WARMUP[st.i].sec);
@@ -134,12 +174,28 @@ function fxTick(now) {
       ring(1);
       return;
     }
-    if (fxMem.key !== 'go' + w.pos) { fxMem.key = 'go' + w.pos; beep(1320, 0.3); if ($f('fx-sub')) $f('fx-sub').textContent = 'מחזיקים! נגיעה = נגמר הכוח'; }
+    if (fxMem.key !== 'go' + w.pos) { fxMem.key = 'go' + w.pos; bell(784, 0, 0.26, 0.8); if ($f('fx-sub')) $f('fx-sub').textContent = 'מחזיקים! נגיעה = נגמר הכוח'; }
     const left = Math.ceil((w.t0 + tgt * 1000 - now) / 1000);
     if (left <= 0) { setDone(st, tgt); beepEnd(); fxNext(); return; }
     countBeeps(left);
     if ($f('fx-time')) $f('fx-time').textContent = mmss(left);
     ring(left / tgt);
+  } else if (st.k === 'fin') {
+    const p = w.finisher.prog;
+    if (p && w.finT) {
+      const el = Math.floor((now - w.finT) / 1000);
+      if (p.mode === 'up') { if ($f('fx-fin-time')) $f('fx-fin-time').textContent = mmss(el); }
+      else {
+        const cyc = p.work + p.rest, total = cyc * p.rounds - p.rest;
+        if (el >= total) { w.finT = 0; chime(); save(); renderFocus(); return; }
+        const r = Math.floor(el / cyc), x = el % cyc, working = x < p.work;
+        const left = working ? p.work - x : cyc - x;
+        if (fxMem.finPh !== r + (working ? 'w' : 'r')) { fxMem.finPh = r + (working ? 'w' : 'r'); working ? bell(784, 0, 0.26, 0.7) : bell(587, 0, 0.22, 0.6); }
+        if (left <= 3 && fxMem.beepAt !== left + 'f' + fxMem.finPh) { fxMem.beepAt = left + 'f' + fxMem.finPh; beep(587, 0.1, 0, 0.2); }
+        if ($f('fx-fin-time')) $f('fx-fin-time').textContent = mmss(left);
+        if ($f('fx-fin-lbl')) $f('fx-fin-lbl').textContent = `סבב ${r + 1} מתוך ${p.rounds} · ${working ? 'עבודה' : 'מנוחה'}`;
+      }
+    }
   } else if (st.k === 'skill') {
     const b = w.blocks[st.b], tot = (b.minutes || 6) * 60;
     const left = Math.ceil((w.t0 + tot * 1000 - now) / 1000);
@@ -165,6 +221,7 @@ function fxTick(now) {
   }
   if ($f('fx-el')) $f('fx-el').textContent = mmss(Math.floor((now - w.started) / 1000));
   if ($f('fx-left')) $f('fx-left').textContent = remainTxt(now);
+  fxTipTick(now);
 }
 function ring(frac) {
   const r = document.getElementById('fx-ring');
@@ -193,7 +250,7 @@ function renderFocus() {
       ${ringSvg(`<div id="fx-time" class="fx-time">${mmss(Math.ceil((w.restEnd - Date.now()) / 1000))}</div>`)}
       <div class="fx-next"><span>הבא</span><b>${nx.title}</b>
         ${gk.keys.length ? `${FG.mini(GUIDES[gk.keys[0]].fig)}<button class="fx-how" data-a="fx-guide">${ic('help')} איך עושים · הסבר מלא</button>` : ''}</div>
-      ${w.restTotal > 20 ? quoteHtml() : ''}</div>`;
+      ${w.restTotal > 20 ? `<div id="fx-tip" class="fx-tip big"></div>` : ''}</div>`;
     foot = `<button class="fx-btn" data-a="fx-back">${ic('undo')}חזרה</button>
       <button class="fx-btn" data-a="fx-add">${ic('plus')}15 שנ׳</button>
       <button class="fx-btn" data-a="extra-open">${ic('dumbbell')}הוסף תרגיל</button>
@@ -213,18 +270,18 @@ function renderFocus() {
     const head = `<div class="fx-kicker">${b.title.replace(/ — .*/, '')} · תרגיל ${st.e + 1}</div>
       <div class="fx-big">${exLabel(e)}</div><div class="fx-dots">${dots}</div>`;
     if (e.unit === 'sec') {
-      body = `<button class="fx-body tap" data-a="fx-holdstop">${head}
+      body = `<button class="fx-body tap compact" data-a="fx-holdstop">${head}${figHtml(st)}
         ${ringSvg(`<div id="fx-time" class="fx-time">${mmss(tgt)}</div><div class="fx-unit">שניות</div>`)}
-        <div id="fx-sub" class="fx-hint">נכנסים לתנוחה…</div><div class="fx-cue">${e.cue}</div></button>`;
+        <div id="fx-sub" class="fx-hint">נכנסים לתנוחה…</div><div id="fx-tip" class="fx-tip"></div></button>`;
     } else {
-      body = `<button class="fx-body tap" data-a="fx-done">${head}
+      body = `<button class="fx-body tap compact" data-a="fx-done">${head}${figHtml(st)}
         <div class="fx-reps"><b>${tgt}</b><span>חזרות</span></div>
-        <div class="fx-cue">${e.cue}</div>
+        <div id="fx-tip" class="fx-tip"></div>
         <div class="fx-press">${ic('check')}<span>גע כשסיימת את הסט</span></div></button>`;
       foot = `<button class="fx-btn" data-a="fx-back" ${w.pos ? '' : 'disabled'}>${ic('undo')}חזרה</button>
         <button class="fx-btn" data-a="fx-guide">${ic('help')}איך עושים</button>
-        <button class="fx-btn" data-a="fx-less">${ic('minus')}פחות</button>
-        <button class="fx-btn" data-a="fx-more">${ic('plus')}יותר</button>`;
+        <button class="fx-btn" data-a="fx-less">${ic('minus')}עשיתי פחות</button>
+        <button class="fx-btn" data-a="fx-more">${ic('plus')}עשיתי יותר</button>`;
     }
     if (e.unit === 'sec') foot = `<button class="fx-btn" data-a="fx-back">${ic('undo')}חזרה</button><button class="fx-btn" data-a="fx-guide">${ic('help')}איך עושים</button>`;
   } else if (st.k === 'skill') {
@@ -245,9 +302,15 @@ function renderFocus() {
       <button class="fx-btn" data-a="fx-guide">${ic('help')}התחנות</button>
       <button class="fx-btn" data-a="fx-emomstop">${ic('stop')}עצור כאן</button>`;
   } else if (st.k === 'fin') {
-    body = `<button class="fx-body tap" data-a="fx-done"><div class="fx-kicker">${ic('wheel')} פיניש</div>
-      <div class="fx-big">${w.finisher.name}</div><div class="fx-cue lg">${w.finisher.desc}</div>${quoteHtml()}
-      <div class="fx-press">${ic('check')}<span>גע כשסיימת</span></div></button>`;
+    const p = w.finisher.prog || {};
+    const g = stepGuide(st);
+    body = `<div class="fx-body compact"><div class="fx-kicker">${ic('wheel')} פיניש</div>
+      <div class="fx-big">${w.finisher.name}</div><div class="fx-cue">${w.finisher.desc}</div>${figHtml(st)}
+      ${p.mode ? `<div class="fx-fin"><div id="fx-fin-lbl" class="fx-hint">${p.mode === 'int' ? `${p.rounds} סבבים: ${p.work} שנ׳ עבודה${p.rest ? `, ${p.rest} מנוחה` : ''}` : (p.label || 'שעון עצר')}</div>
+        <div id="fx-fin-time" class="fx-time sm">${p.mode === 'int' ? mmss(p.work) : '0:00'}</div>
+        <button class="fx-save" data-a="fx-fintimer">${w.finT ? ic('stop') + ' עצור' : ic('play') + ' התחל טיימר'}</button></div>` : ''}
+      <div id="fx-tip" class="fx-tip"></div>
+      <button class="fx-press" data-a="fx-done">${ic('check')}<span>סיימתי את הפיניש</span></button></div>`;
     foot = `<button class="fx-btn" data-a="fx-back">${ic('undo')}חזרה</button>
       <button class="fx-btn" data-a="fx-guide">${ic('help')}איך עושים</button>
       <button class="fx-btn" data-a="fx-finskip">${ic('skip')}בלי פיניש היום</button>`;
@@ -320,13 +383,13 @@ Object.assign(A, {
     if (st.k === 'set') setDone(st, fxEx(st).target[st.s]);
     if (st.k === 'skill') w.blocks[st.b].done = true;
     if (st.k === 'fin') w.finisherDone = true;
-    beep(1100, 0.12); fxNext();
+    beep(988, 0.12, 0, 0.25); fxNext();
   },
   'fx-holdstop'() {
     const w = S.current, st = fxStep(), now = Date.now();
     if (now < w.t0) { w.t0 = now; save(); return; } // נגיעה בזמן ההכנה = מתחילים עכשיו
     const e = fxEx(st), held = Math.min(e.target[st.s], Math.max(0, Math.round((now - w.t0) / 1000)));
-    setDone(st, held); beep(1100, 0.12); fxNext();
+    setDone(st, held); beep(988, 0.12, 0, 0.25); fxNext();
   },
   'fx-less'() { const st = fxStep(); S.current.pick = { b: st.b, e: st.e, s: st.s }; renderFocus(); },
   'fx-more'() { const st = fxStep(); S.current.pick = { b: st.b, e: st.e, s: st.s, more: true }; renderFocus(); },
@@ -336,7 +399,7 @@ Object.assign(A, {
     const w = S.current, p = w.pick, e = w.blocks[p.b].ex[p.e], v = +t.dataset.v;
     e.done[p.s] = v; e.log[p.s] = v; w.pick = null;
     if (p.fix) { save(); renderFocus(); return; }
-    beep(1100, 0.12); fxNext();
+    beep(988, 0.12, 0, 0.25); fxNext();
   },
   'fx-back'() { fxBack(); },
   'fx-skip'() { fxEnter(); },
@@ -346,6 +409,7 @@ Object.assign(A, {
     while (w.flow[w.pos].k === 'warm') w.pos++;
     fxEnter();
   },
+  'fx-fintimer'() { const w = S.current; w.finT = w.finT ? 0 : Date.now(); fxMem.finPh = null; if (w.finT) bell(784, 0, 0.26, 0.7); renderFocus(); },
   'fx-finskip'() { S.current.finisherDone = false; fxNext(); },
   'fx-emomstop'() {
     const b = S.current.blocks[fxStep().b];
@@ -355,7 +419,7 @@ Object.assign(A, {
   'fx-tdec'() { const k = fxStep().key, w = S.current; w.boss[k] = Math.max(0, (+w.boss[k] || 0) - 1); save(); renderFocus(); },
   'fx-binc'(t) { const w = S.current; w.boss[t.dataset.k] = (+w.boss[t.dataset.k] || 0) + 1; save(); renderFocus(); },
   'fx-bdec'(t) { const w = S.current; w.boss[t.dataset.k] = Math.max(0, (+w.boss[t.dataset.k] || 0) - 1); save(); renderFocus(); },
-  'fx-tsave'() { beep(1100, 0.12); fxNext(); },
+  'fx-tsave'() { beep(988, 0.12, 0, 0.25); fxNext(); },
   'fx-list'() { S.current.list = true; save(); render(); scrollTo(0, 0); },
   'fx-open'() {
     const w = S.current; w.list = false;

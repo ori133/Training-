@@ -12,7 +12,7 @@ function defaultState() {
     onboarded: false, tracks: {}, history: [], tests: [], xp: 0,
     achievements: {}, claimed: {}, gtg: {}, waist: [], photoCount: 0, photoWeeks: {}, waistWeeks: {},
     skills: { active: 'muscleup', progress: {} },
-    rot: 0, blockCount: 0, current: null, tab: 'today', forceDate: null, updatedAt: 0, voice: true, theme: 'auto', introSound: true,
+    rot: 0, blockCount: 0, current: null, tab: 'today', forceDate: null, updatedAt: 0, voice: true, theme: 'auto', introSound: true, counters: {},
   };
 }
 function load() {
@@ -90,8 +90,19 @@ function stats() {
     totalPush: sum('push'), photos: S.photoCount,
     waistDrop: w.length > 1 ? Math.round((w[0].cm - w[w.length - 1].cm) * 10) / 10 : 0,
     skillStages, skillsDone,
+    perfect: S.history.filter(h => h.perfect).length,
+    early: S.history.filter(h => h.hour != null && h.hour < 8).length,
+    night: S.history.filter(h => h.hour != null && h.hour >= 21).length,
+    weekend: S.history.filter(h => { const d = parseKey(h.date).getDay(); return d === 5 || d === 6; }).length,
+    comeback: (() => { const ds = S.history.map(h => h.date).sort(); let n = 0; for (let i = 1; i < ds.length; i++) if ((parseKey(ds[i]) - parseKey(ds[i - 1])) / 864e5 >= 10) n++; return n; })(),
+    extras: (S.counters || {}).extras || 0, guides: (S.counters || {}).guides || 0, music: (S.counters || {}).music || 0,
+    totalMins: S.history.reduce((a, h) => a + (h.mins || 0), 0), totalLegs: sum('legs'), totalCoreSec: sum('coreSec'),
+    prs: S.history.reduce((a, h) => a + (h.prs ? h.prs.length : 0), 0),
+    finTypes: new Set(S.history.map(h => h.finisher).filter(Boolean)).size,
   };
 }
+function cnt(k, n = 1) { S.counters = S.counters || {}; S.counters[k] = (S.counters[k] || 0) + n; runChecks(); flush(); }
+
 function weekMetrics(wk) {
   const hs = S.history.filter(h => weekKey(h.date) === wk);
   const t = k => hs.reduce((a, h) => a + ((h.totals && h.totals[k]) || 0), 0);
@@ -178,12 +189,19 @@ const exLabel = e => e.v + (e.kg ? ` · +${e.kg} ק״ג` : '');
 // ---------- סיום אימון ----------
 function completeWorkout(fb) {
   const w = S.current; const ups = [], downs = [];
-  const totals = { pull: 0, push: 0, legs: 0, coreSec: 0 }; let setsHit = 0;
+  const totals = { pull: 0, push: 0, legs: 0, coreSec: 0 }; let setsHit = 0, allSets = 0; const partial = [];
   for (const b of w.blocks) {
     if (b.type === 'superset') for (const e of b.ex) {
       const TT = TRACKS[e.track]; const g = TT ? TT.group : e.group; const sum = e.done.reduce((a, x) => a + (x || 0), 0);
       if (e.unit === 'sec') totals.coreSec += sum; else if (totals[g] !== undefined) totals[g] += sum;
       e.done.forEach((x, i) => { if (x != null && x >= e.target[i]) setsHit++; });
+      allSets += e.target.length;
+      const tgtSum = e.target.reduce((q, x) => q + x, 0);
+      if (!e.done.every((x, i) => x != null && x >= e.target[i])) {
+        const ratio = sum / tgtSum, tr0 = TT ? S.tracks[e.track] : null;
+        partial.push({ name: exLabel(e), did: sum, of: tgtSum, unit: e.unit === 'sec' ? 'שניות' : 'חזרות',
+          note: !TT ? 'תוספת, לא משנה את ההתקדמות' : ratio >= 0.75 ? 'כמעט שם. נשארים באותו שלב' : tr0.fails >= 1 ? 'פעם שנייה ברצף. נרד שלב כדי לבנות בסיס' : 'היה קשה. נשארים באותו שלב, ואם זה יחזור נרד שלב' });
+      }
       if (!TT) continue; // תוספת שבחרת להיום — לא משנה את שלב ההתקדמות
       const hit = e.done.every((x, i) => x != null && x >= e.target[i]);
       const tr = S.tracks[e.track], n = TRACKS[e.track].stages.length;
@@ -210,11 +228,12 @@ function completeWorkout(fb) {
   }
   const xp = 100 + setsHit * 5 + ups.length * 20 + (w.finisherDone ? 30 : 0);
   S.history.push({ date: dkey(), type: w.type, totals, finisher: w.finisherDone ? w.finisher.name : null,
-    feedback: fb, xp, progressions: ups, mins: Math.round((Date.now() - w.started) / 60000) });
+    feedback: fb, xp, progressions: ups, mins: Math.round((Date.now() - w.started) / 60000),
+    perfect: allSets >= 6 && partial.length === 0, hour: new Date(w.started).getHours() });
   S.rot = (ROTATION.indexOf(w.type) + 1) % ROTATION.length;
   S.blockCount++;
   S.current = null; keepAwake(false); stopRest();
-  celebrations.unshift({ type: 'summary', xp, ups, downs, totals, mins: S.history[S.history.length - 1].mins });
+  celebrations.unshift({ type: 'summary', xp, ups, downs, partial, totals, mins: S.history[S.history.length - 1].mins });
   addXp(xp); runChecks(); confetti(); render(); flush();
 }
 function completeBoss() {
@@ -260,6 +279,15 @@ function heroCard() {
     <div class="bar"><i style="width:${pct}%"></i></div></div>`;
 }
 
+const TIP_POOL = [...TIPS.map(t => [t, '']), ...QUOTES_MID.map(q => [q[0], q[1]]), ...QUOTES_END.map(q => [q[0], q[1]])];
+let tipI = 0;
+setInterval(() => {
+  const p = document.getElementById('tip-p'); if (!p) return;
+  tipI = (tipI + 1) % TIP_POOL.length;
+  p.style.opacity = 0; document.getElementById('tip-c').style.opacity = 0;
+  setTimeout(() => { const t = TIP_POOL[tipI], c = document.getElementById('tip-c'); if (!p.isConnected) return; p.textContent = t[0]; c.textContent = t[1] || ''; p.style.opacity = 1; c.style.opacity = 1; }, 450);
+}, 12000);
+
 function renderToday() {
   let h = heroCard();
   if (S.current) return h + renderWorkout();
@@ -281,7 +309,9 @@ function renderToday() {
   }
   if (nt !== 'BOSS') h += `<div class="card slim">${ic('boss')} עוד <b>${BLOCK_LENGTH - S.blockCount}</b> אימונים לקרב הבוס הבא</div>`;
   h += challengesCard(true);
-  h += `<div class="card tip"><b>${ic('bulb')} טיפ היום</b><p>${TIPS[Math.round(parseKey(today).getTime() / 864e5) % TIPS.length]}</p></div>`;
+  tipI = Math.round(parseKey(today).getTime() / 864e5) % TIP_POOL.length;
+  const tp = TIP_POOL[tipI];
+  h += `<div class="card tip"><b>${ic('bulb')} טיפ <small class="muted" id="tip-n"></small></b><p id="tip-p">${tp[0]}</p><cite id="tip-c">${tp[1] || ''}</cite></div>`;
   return h;
 }
 
@@ -362,6 +392,7 @@ function renderWorkout() {
           const d = e.done[si] != null;
           h += `<div class="set ${d ? (e.done[si] >= t ? 'ok' : 'part') : ''}"><span class="sn">סט ${si + 1}</span>
             <button class="sm" data-a="minus" data-b="${bi}" data-e="${ei}" data-s="${si}" ${d ? 'disabled' : ''}>−</button>
+            ${e.unit === 'sec' ? `<button class="sm" data-a="set-timer" data-s="${t}" aria-label="טיימר">${ic('timer')}</button>` : ''}
             <span class="val"><b>${e.log[si]}</b><small>/${t}</small></span>
             <button class="sm" data-a="plus" data-b="${bi}" data-e="${ei}" data-s="${si}" ${d ? 'disabled' : ''}>+</button>
             <button class="check" data-a="ok" data-b="${bi}" data-e="${ei}" data-s="${si}">${ic(d ? 'undo' : 'check')}</button></div>`;
@@ -393,7 +424,7 @@ function renderWorkout() {
       <button class="cta alt" data-a="spin">סובב את הגלגל</button></div>`;
   } else {
     h += `<div class="card wheel"><h3>${ic('wheel')} פיניש</h3><div class="wheel-box">${w.finisher.name}</div><p class="muted">${w.finisher.desc}</p>
-      ${w.finisherDone ? `<p class="ok-text">${ic('check')} הושלם! +30 XP</p>` : `<button class="ghost" data-a="fin-done">${ic('check')} סיימתי את הפיניש</button>`}</div>`;
+      ${w.finisherDone ? `<p class="ok-text">${ic('check')} הושלם! +30 XP</p>` : `${w.finisher.prog && w.finisher.prog.mode === 'int' ? `<button class="ghost" data-a="fin-timer">${ic('timer')} טיימר ${mmss((w.finisher.prog.work + w.finisher.prog.rest) * w.finisher.prog.rounds - w.finisher.prog.rest)}</button>` : ''}<button class="ghost" data-a="fin-done">${ic('check')} סיימתי את הפיניש</button>`}</div>`;
   }
   h += `<button class="ghost" data-a="extra-open">${ic('plus')} הוסף תרגיל להיום</button>
     <button class="cta" data-a="finish">${ic('flag')} סיים אימון</button><button class="link danger" data-a="cancel">בטל אימון</button>`;
@@ -522,6 +553,7 @@ function flush() {
     showModal(`${ic('flag', 'big')}<h2>אימון הושלם!</h2><div class="xp-big">+${c.xp} XP</div>
       <div class="kpis"><div><b>${t.pull}</b><small>משיכות</small></div><div><b>${t.push}</b><small>דחיפות</small></div><div><b>${c.mins}</b><small>דקות</small></div></div>
       ${c.ups.length ? `<h3>${ic('trend')} עלית שלב!</h3>${c.ups.map(u => `<div class="up"><b>${u.name}</b><small>${u.to}</small></div>`).join('')}` : '<p class="muted">לא עלית שלב הפעם — בפעם הבאה סגור את כל הסטים ותעלה.</p>'}
+      ${c.partial && c.partial.length ? `<h3>${ic('target')} סטים שלא השלמת</h3>${c.partial.map(p => `<div class="up"><b>${p.name}: ${p.did} מתוך ${p.of} ${p.unit}</b><small style="color:var(--muted)">${p.note}</small></div>`).join('')}` : ''}
       ${c.downs.length ? `<p class="muted small">ירדנו שלב ב: ${c.downs.map(d => d.name).join(', ')} — כדי לבנות בסיס חזק.</p>` : ''}
       <button class="cta" data-a="close">מעולה</button>`);
   } else if (c.type === 'boss') {
@@ -564,14 +596,22 @@ function unlockAudio() {
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
   if (actx && actx.state === 'suspended') actx.resume();
 }
-function beep(f = 880, d = 0.18, when = 0) {
+function beep(f = 880, d = 0.18, when = 0, vol = 0.5) {
   if (!actx) return;
   const o = actx.createOscillator(), g = actx.createGain(); o.frequency.value = f; o.connect(g); g.connect(actx.destination);
   const t = actx.currentTime + when;
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
   o.start(t); o.stop(t + d + 0.05);
 }
-const beepEnd = () => { beep(880, 0.15); beep(880, 0.15, 0.25); beep(1320, 0.35, 0.5); };
+// צלצול נעים וקצר: שני צלילים רכים עם דעיכה, בלי חדות
+function bell(f, when, vol, d) {
+  if (!actx) return;
+  const t = actx.currentTime + when, g = actx.createGain(); g.connect(actx.destination);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  [[f, 1], [f * 2, 0.22], [f * 3, 0.06]].forEach(([fr, k]) => { const o = actx.createOscillator(), gg = actx.createGain(); o.type = 'sine'; o.frequency.value = fr; gg.gain.value = k; o.connect(gg); gg.connect(g); o.start(t); o.stop(t + d + 0.05); });
+}
+const chime = () => { bell(659.25, 0, 0.28, 0.9); bell(880, 0.22, 0.28, 1.1); };
+const beepEnd = chime;
 
 let wl = null;
 async function keepAwake(on) {
@@ -594,7 +634,7 @@ function tick() {
     const left = Math.ceil((rest.end - now) / 1000);
     if (left <= 0) { stopRest(); beepEnd(); }
     else {
-      if (left <= 3 && rest.lastBeep !== left) { rest.lastBeep = left; beep(660, 0.08); }
+      if (left <= 3 && rest.lastBeep !== left) { rest.lastBeep = left; beep(587, 0.1, 0, 0.2); }
       $('#rest-label').textContent = rest.label; $('#rest-time').textContent = mmss(left);
       $('#rest-prog').style.width = `${(left / rest.total) * 100}%`;
     }
@@ -607,9 +647,9 @@ function tick() {
     if (b.type !== 'emom' || !b.startAt || now < b.startAt || b.stopped || b.roundsDone >= b.minutes) return;
     const e = (now - b.startAt) / 1000, m = Math.floor(e / 60);
     if (m >= b.minutes) { b.roundsDone = b.minutes; save(); beepEnd(); render(); return; }
-    if (lastEmomMin[bi] !== m) { if (lastEmomMin[bi] !== undefined || fx) beep(1320, 0.3); lastEmomMin[bi] = m; b.roundsDone = m; save(); }
+    if (lastEmomMin[bi] !== m) { if (lastEmomMin[bi] !== undefined || fx) bell(784, 0, 0.26, 0.8); lastEmomMin[bi] = m; b.roundsDone = m; save(); }
     const secLeft = 60 - Math.floor(e % 60);
-    if (secLeft <= 3 && lastEmomSec[bi] !== secLeft) { lastEmomSec[bi] = secLeft; beep(660, 0.08); }
+    if (secLeft <= 3 && lastEmomSec[bi] !== secLeft) { lastEmomSec[bi] = secLeft; beep(587, 0.1, 0, 0.2); }
     if (fx || S.tab !== 'today') return;
     const st = b.stations[m % b.stations.length], nx = b.stations[(m + 1) % b.stations.length];
     const box = $(`#emom-${bi}`);
@@ -714,8 +754,10 @@ const A = {
   rest(t) { startRest(+t.dataset.s, 'מנוחה'); },
   'rest-add'() { if (rest) { rest.end += 15000; rest.total += 15; } },
   'rest-skip'() { stopRest(); },
+  'set-timer'(t) { startRest(+t.dataset.s, 'החזקה'); },
+  'fin-timer'() { const p = S.current.finisher.prog; if (p && p.mode === 'int') startRest((p.work + p.rest) * p.rounds - p.rest, 'פיניש'); },
   'skill-done'(t) { const b = S.current.blocks[+t.dataset.b]; b.done = !b.done; save(); render(); },
-  'emom-start'(t) { const b = S.current.blocks[+t.dataset.b]; b.startAt = Date.now(); b.roundsDone = 0; lastEmomMin = {}; beep(1320, 0.3); save(); render(); },
+  'emom-start'(t) { const b = S.current.blocks[+t.dataset.b]; b.startAt = Date.now(); b.roundsDone = 0; lastEmomMin = {}; bell(784, 0, 0.26, 0.8); save(); render(); },
   'emom-stop'(t) { const b = S.current.blocks[+t.dataset.b]; b.roundsDone = Math.floor((Date.now() - b.startAt) / 60000); b.stopped = true; save(); render(); },
   spin() {
     const box = $('#wheel'); if (!box || box.dataset.spin) return; box.dataset.spin = 1;
@@ -725,7 +767,7 @@ const A = {
       box.textContent = FINISHERS[i++ % FINISHERS.length].name; beep(500 + (i % 5) * 80, 0.03);
       delay *= 1.12;
       if (delay < 420) setTimeout(step, delay);
-      else { box.textContent = pick.name; box.classList.add('pop'); beep(1320, 0.3); setTimeout(() => { S.current.finisher = pick; save(); render(); }, 700); }
+      else { box.textContent = pick.name; box.classList.add('pop'); bell(784, 0, 0.26, 0.8); setTimeout(() => { S.current.finisher = pick; save(); render(); }, 700); }
     };
     step();
   },
