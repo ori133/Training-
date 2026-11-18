@@ -289,7 +289,8 @@ function nextCard(t) {
   if (t === 'BOSS') {
     return `<div class="card boss"><div class="tag">קרב בוס</div><h2>${ic('boss')} הגיע הזמן לבדוק כמה התחזקת</h2>
       <p>3 מבחני מקסימום: מתח, מקבילים ושכיבות סמיכה. 3 דקות מנוחה ביניהם, רק חזרות נקיות. לפי התוצאות התוכנית מתעדכנת.</p>
-      <button class="cta" data-a="start" data-t="BOSS">${ic('swords')} להילחם</button></div>`;
+      <button class="cta" data-a="start" data-t="BOSS">${ic('swords')} להילחם</button>
+      <button class="ghost" data-a="boss-skip">${ic('dumbbell')} לא עכשיו — אימון רגיל במקום</button></div>`;
   }
   const W = WORKOUTS[t];
   let list = '';
@@ -783,11 +784,16 @@ const A = {
       <button class="ghost" data-a="music-open">${ic('music')} מוזיקה (Spotify / Apple Music)</button>
       <button class="ghost" data-a="science">${ic('book')} המדע שמאחורי התוכנית</button>
       ${syncSettingsHtml()}
-      <button class="ghost" data-a="boss-now">${ic('boss')} קרב בוס עכשיו</button>
+      <button class="ghost" data-a="boss-now">${ic('boss')} קרב בוס עכשיו (מדלג על האימונים הרגילים)</button>
       <button class="ghost" data-a="export">${ic('download')} גיבוי נתונים</button>
       <button class="ghost" data-a="import">${ic('upload')} שחזור מגיבוי</button><input id="import-in" type="file" accept="application/json" hidden>
       <button class="link danger" data-a="reset">איפוס מלא</button>
       <button class="cta" data-a="close">סגור</button>`);
+  },
+  'boss-skip'() {
+    // חוזרים לספירה האמיתית: כמה אימונים נעשו מאז קרב הבוס האחרון
+    let n = 0; for (let i = S.history.length - 1; i >= 0 && S.history[i].type !== 'BOSS'; i--) n++;
+    S.blockCount = Math.min(n, BLOCK_LENGTH - 1); save(); render(); toast('חזרנו לאימונים רגילים');
   },
   'boss-now'() { S.blockCount = BLOCK_LENGTH; save(); closeModal(); S.tab = 'today'; render(); },
   export() {
