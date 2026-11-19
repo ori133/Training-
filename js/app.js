@@ -161,6 +161,17 @@ function emomStations() {
     { name: 'מטפסי הרים', reps: '30 שנ׳', kind: 'cardio' },
   ];
 }
+// יעד הסקיל להיום. במאסל-אפ השלב הראשון הוא 10 מתח, אז למי שעוד לא שם נותנים יעד שמתאים לרמה שלו
+function skillGoal(id, p) {
+  const sk = SKILLS[id];
+  if (p >= sk.stages.length) return 'שמירה על הסקיל — תרגול חופשי';
+  const mp = Math.max(0, ...S.tests.map(t => t.pull || 0));
+  if (id === 'muscleup' && p === 0 && mp < 10) {
+    return `בונים בסיס למאסל-אפ: מתח נקי. היעד שלך עכשיו ${mp + 1} רצופים (השיא שלך: ${mp}). 10 רצופים הוא היעד לפתיחת השלב הבא, לא משהו שצריך לעשות היום.`;
+  }
+  return sk.stages[p];
+}
+
 function buildWorkout(type) {
   const w = { type, date: dkey(), started: Date.now(), warmupDone: false, blocks: [], finisher: null, finisherDone: false };
   if (type === 'BOSS') { w.boss = { pull: '', dip: '', push: '' }; return w; }
@@ -174,7 +185,7 @@ function buildWorkout(type) {
     } else if (b.type === 'skill') {
       const sid = S.skills.active, p = S.skills.progress[sid] || 0, sk = SKILLS[sid];
       w.blocks.push({ type: 'skill', title: b.title, skill: sid, minutes: b.minutes || 6,
-        stage: p < sk.stages.length ? sk.stages[p] : 'שמירה על הסקיל — תרגול חופשי', done: false });
+        stage: skillGoal(sid, p), done: false });
     } else if (b.type === 'emom') {
       w.blocks.push({ type: 'emom', title: b.title, minutes: b.minutes, stations: emomStations(), roundsDone: 0, startAt: 0 });
     }
@@ -510,7 +521,7 @@ function renderSkills() {
     const sk = SKILLS[id], p = S.skills.progress[id] || 0, active = S.skills.active === id;
     h += `<div class="card skill ${active ? 'active' : ''}"><div class="row"><h3>${ic(sk.icon)} ${sk.name}</h3><span class="muted small">${p}/${sk.stages.length}</span></div>
       <div class="bar thin"><i style="width:${(p / sk.stages.length) * 100}%"></i></div>
-      <ol class="tree">${sk.stages.map((s, i) => `<li class="${i < p ? 'ok' : i === p ? 'cur' : ''}">${i < p ? ic('check') + ' ' : ''}${s}</li>`).join('')}</ol>
+      <ol class="tree">${sk.stages.map((s, i) => `<li class="${i < p ? 'ok' : i === p ? 'cur' : ''}">${i < p ? ic('check') + ' ' : ''}${s}${i === p && id === 'muscleup' && p === 0 && skillGoal(id, p) !== s ? `<div class="small muted">היעד שלך כרגע: ${Math.max(0, ...S.tests.map(t => t.pull || 0)) + 1} מתח רצופים. עדיין לא צריך 10.</div>` : ''}</li>`).join('')}</ol>
       <div class="row">${p < sk.stages.length ? `<button class="ghost" data-a="skill-up" data-k="${id}">${ic('check')} השגתי את השלב</button>` : `<span class="ok-text">${ic('belt')} הושלם!</span>`}
       ${active ? '<span class="tag">פעיל באימון C</span>' : `<button class="link" data-a="skill-active" data-k="${id}">בחר לאימון C</button>`}</div></div>`;
   }

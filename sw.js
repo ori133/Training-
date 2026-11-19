@@ -1,5 +1,5 @@
 // Service worker — עבודה בלי אינטרנט. להעלות את הגרסה בכל שינוי בקבצים.
-const CACHE = 'trainer-v18';
+const CACHE = 'trainer-v19';
 const FILES = ['./', 'index.html', 'css/style.css', 'js/data.js', 'js/figs.js', 'js/guides.js', 'js/science.js', 'js/icons.js', 'js/sync.js', 'js/intro.js', 'js/app.js', 'js/extras.js', 'js/focus.js', 'manifest.webmanifest',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
